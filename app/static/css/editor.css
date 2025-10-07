@@ -1,0 +1,203 @@
+.page-editor {
+  display: grid;
+  grid-template-rows: 48px 1fr;
+  grid-template-columns: 80px 1fr 260px;
+  grid-template-areas:
+    "menubar menubar menubar"
+    "toolbar canvas  layers";
+  height: 100vh;
+  background: var(--bg-1);
+}
+
+
+.menubar {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  grid-area: menubar;
+  display: grid;
+  grid-template-columns: 80px 1fr 260px; 
+  align-items: center;
+  height: 48px;                 
+  padding: 0;                   
+  background: linear-gradient(180deg, var(--bg-2), #182235);
+  border-bottom: 1px solid var(--ui-1);
+}
+
+.menus {
+  grid-column: 2;
+  justify-self: center;        
+  align-items: center;
+  gap: .5rem;
+}
+
+.menus details {
+  position: relative;         
+  display: inline-block;
+}
+
+.menus summary::marker { 
+    content: ""; 
+}
+.menus summary:hover { 
+    background: var(--ui-1); 
+}
+
+.menus ul {
+  position: absolute;
+  top: calc(100% + 1px);        
+  left: 0;
+  background: var(--bg-2);
+  border: 1px solid var(--ui-1);
+  border-radius: .5rem;
+  padding: .4rem;
+  margin: 0;
+  min-width: 180px;
+  box-shadow: 0 10px 20px rgba(0,0,0,.35);
+  z-index: 10;
+}
+.menus li { 
+    list-style: none; 
+    margin: 0; 
+}
+
+.menus a {
+  display: block;
+  padding: .4rem .6rem;
+  border-radius: .4rem;
+  color: var(--fg-1);
+}
+.menus a:hover { 
+    background: var(--ui-1); 
+}
+
+
+.toolbar {
+  grid-area: toolbar;
+  background: var(--bg-2);
+  display: flex; flex-direction: column;
+  align-items: center; padding: .6rem; gap: .6rem;
+  border-right: 1px solid var(--ui-1);
+  box-shadow: 2px 0 10px rgba(0,0,0,0.25);
+}
+.toolbar hr {
+     width: 100%; 
+     border: none; 
+     border-top: 1px solid var(--ui-1); 
+     margin: .4rem 0; 
+}
+.toolbar button { 
+    width: 48px; 
+    height: 48px; 
+    border-radius: 10px; 
+}
+
+.canvas-area {
+  grid-area: canvas;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  position: relative;
+}
+.canvas-placeholder {
+  width: 800px; 
+  height: 550px;
+  margin-bottom: 0px;
+  background-color: white;
+  border: 2px dashed #475569; 
+  border-radius: 12px;
+  color: #000;
+  display: flex; 
+  align-items: center; 
+  justify-content: center;
+  font-size: 1.05rem;
+}
+
+/* Optional: klargjort markup for høyreklikkmeny (skjult) */
+/*.context-menu {
+  position: absolute; background: var(--bg-2);
+  border: 1px solid var(--ui-1); border-radius: .5rem;
+  padding: .25rem; display: flex; flex-direction: column; gap: .25rem;
+  box-shadow: 0 10px 20px rgba(0,0,0,.35);
+}*/
+
+.layers-panel {
+  grid-area: layers;
+  background: var(--bg-2);
+  border-left: 1px solid var(--ui-1);
+  padding: .75rem; display: flex; flex-direction: column; gap: .75rem;
+  box-shadow: -2px 0 10px rgba(0,0,0,0.25);
+}
+.layers-header { 
+    display: flex; 
+    align-items: center; 
+    justify-content: space-between; 
+}
+.layer-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); 
+  gap: 0.5rem;                            
+  margin-top: 0.5rem;
+}
+
+.layer-actions button {
+    margin-bottom: 10px;
+}
+
+.layers-list { 
+    list-style: none; 
+    display: flex; 
+    flex-direction: column; 
+    gap: .5rem; 
+    padding: 0; 
+    margin: 0; 
+}
+.layer-item {
+  background: var(--ui-1); 
+  padding: .6rem .8rem;
+  border-radius: 8px; 
+  cursor: pointer; 
+  transition: .2s;
+}
+.layer-item:hover { 
+    background: var(--brand); 
+}
+.layer-item.active { 
+    outline: 2px solid var(--brand); 
+}
+
+
+.zoom {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .25rem;              
+  background: rgba(15,23,42,.9);
+  padding: .2rem .4rem;     
+  border-radius: 6px;       
+  box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  transform: scale(0.8);    
+}
+
+.zoom input[type="range"] {
+  width: 120px;             
+  height: 4px;             
+}
+
+.zoom button {
+  font-size: 0.9rem;       
+  padding: 0.2rem 0.4rem;   
+}
+
+.zoom .zoom-value {
+  min-width: 36px;         
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+.zoom-overlay {
+  grid-column: 2;            
+  position: relative;         
+  display: flex;
+  justify-content: center;    
+  margin-top: 5px;              
+}

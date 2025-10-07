@@ -1,1 +1,72 @@
-/* Main stylesheet for the app interface (panels, buttons, canvas layout). */
+
+* { 
+  margin: 0; 
+  padding: 0; 
+  box-sizing: border-box; 
+}
+
+:root {
+  --bg-1: #0f172a;
+  --bg-2: #1e293b;
+  --fg-1: #f8fafc;
+  --fg-2: #94a3b8;
+  --ui-1: #334155;
+  --brand: #2563eb;
+}
+
+
+body {
+  font-family: "Inter", Arial, sans-serif;
+  color: var(--fg-1);
+  background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+}
+
+h1 {
+  font-size: 2.5rem;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+button {
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
+  font-weight: 500;
+  border: 0;
+  border-radius: 10px;
+  background-color: var(--ui-1);
+  color: var(--fg-1);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+}
+button:hover {
+  background-color: var(--brand);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 15px rgba(37, 99, 235, 0.4);
+}
+button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+}
+
+.center-screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fade-in {
+  animation: fadeIn 0.8s ease-in-out;
+}
+footer {
+  position: fixed;
+  bottom: 15px;
+  font-size: 0.85rem;
+  color: var(--fg-2);
+}
+
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
