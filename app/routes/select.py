@@ -1,0 +1,1 @@
+# Endpoints for selection tools (rectangle, lasso, magic wand, etc.).

@@ -1,0 +1,1 @@
+# App configuration (secret key, storage path, max upload size, etc.).
