@@ -1,7 +1,6 @@
 import Layer
 import numpy as np
 
-# TODO: if stack empty, delete layer
 class LayerStack:
 
     # Creates and selects a white background layer
@@ -27,15 +26,21 @@ class LayerStack:
 
     # Get layer_array[i]
     def at(self, i):
+        if i >= np.size(self._layer_array):
+            return 0
         return self._layer_array[i]
 
     # Get currently selected layer
     def get_current_layer(self):
+        if (self._selected_layer >= np.size(self._layer_array)) or (self._selected_layer < 0):
+            return 0
         return self._layer_array[self._selected_layer]
 
-    # Replace the currently selected layer (rename?)
-    def set_current_layer(self, layer):
-        self._layer_array[self._selected_layer] = layer
+    # Replace the currently selected layer
+    def replace_current_layer(self, updated_layer):
+        if self._selected_layer < 0:
+            return
+        self._layer_array[self._selected_layer] = updated_layer
 
     # Choose a layer to be "selected"
     def select_layer(self, i):
@@ -49,6 +54,13 @@ class LayerStack:
             return
         self._layer_array[i], self._layer_array[j] = self._layer_array[j], self._layer_array[i]
 
+    # Delete layer at index
+    def delete_layer(self, i):
+        if i >= np.size(self._layer_array):
+            return
+        if i >= self._selected_layer:
+            i = i-1
+        self._layer_array = np.delete(self._layer_array, i)
 
     # Takes images from all layers and combine them, in order, to a single image
     def get_collapsed_stack_as_image(self):
