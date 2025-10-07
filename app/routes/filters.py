@@ -1,0 +1,1 @@
+# Endpoints for image filters (blur, sharpen, grayscale, etc.).

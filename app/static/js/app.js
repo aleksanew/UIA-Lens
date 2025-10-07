@@ -1,0 +1,1 @@
+// Handles browser logic and connects to Flask API via fetch().

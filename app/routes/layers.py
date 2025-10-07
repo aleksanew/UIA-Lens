@@ -1,0 +1,1 @@
+# Endpoints for adding/removing/renaming/compositing image layers.

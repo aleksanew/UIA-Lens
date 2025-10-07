@@ -1,0 +1,1 @@
+# Creates the Flask app and registers all blueprints.

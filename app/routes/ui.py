@@ -1,0 +1,1 @@
+# Renders HTML templates (e.g., / → index.html, /editor → editor.html).

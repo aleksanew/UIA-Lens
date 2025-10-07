@@ -1,0 +1,1 @@
+# Endpoints for brush, eraser, bucket, and shape drawing tools.

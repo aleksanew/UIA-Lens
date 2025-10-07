@@ -1,0 +1,1 @@
+# Handles image operations (resize, crop, filter, combine layers) using Pillow/OpenCV.
