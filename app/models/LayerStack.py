@@ -1,5 +1,6 @@
 import Layer
 import numpy as np
+import pickle
 
 class LayerStack:
 
@@ -105,3 +106,50 @@ class LayerStack:
             dst[:, :, 3] = np.clip(ao * 255, 0, 255).astype(np.uint8)
 
         return dst
+
+    # Unsure if filetype should be required in path.
+    # Add/remove depending on what makes sense with load/save implementation
+    def save_pickle(self, path):
+        try:
+            with open(f"{path}.ual", "wb") as f:
+                # noinspection PyTypeChecker
+                pickle.dump(self, f)
+                return True
+        except Exception as e:
+            print("error saving:", e)
+            return False
+
+    # Unsure if filetype should be required in path.
+    # Add/remove depending on what makes sense with load/save implementation
+    def load_pickle(self, path):
+        # Could add check for "ual" filetype,
+        # but code does not actually care about filename
+        with open(f"{path}", "rb") as f:
+            try:
+                db = pickle.load(f)
+            except Exception as e:
+                print("depickling error:", e)
+                return False
+
+            # Pickle must have correct structure
+            if not isinstance(db, LayerStack):
+                print("error in file content/structure")
+                return False
+
+            # All layers must have same height/width
+            for i, x in enumerate(db._layer_array):
+                h, w, d = x.get_image().shape
+                if (h != db._height) or (w != db._width):
+                    print("height/width mismatch")
+                    return False
+
+            self._layer_array = db._layer_array
+            self._height = db._height
+            self._width = db._width
+            # Ensures selected layer is in bounds of array
+            if db._selected_layer >= np.size(db._layer_array):
+                self._selected_layer = np.size(db._layer_array) - 1
+            else:
+                self._selected_layer = db._selected_layer
+
+            return True
