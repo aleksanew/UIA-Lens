@@ -1,1 +1,159 @@
-<!-- The actual editing workspace — toolbar, canvas, layers list. -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UIA Lens — Editor</title>
+  <link rel="stylesheet" href="../static/css/main.css" />
+  <link rel="stylesheet" href="../static/css/editor.css" />
+</head>
+
+
+
+<body class="page-editor">
+  <header class="menubar">
+    <div class="brand">UIA Lens</div>
+    <nav class="menus">
+      <details>
+        <summary>File</summary>
+        <ul>
+          <li><a href="#">New</a></li>
+          <li><a href="#">Open</a></li>
+          <li><a href="#">Save</a></li>
+          <li><a href="#">Save As…</a></li>
+          <li><a href="#">Properties</a></li>
+          <li class="sep"></li>
+          <li><a href="#">Quit</a></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>Select</summary>
+        <ul>
+          <li><a href="#">Rectangular</a></li>
+          <li><a href="#">Freeform</a></li>
+          <li><a href="#">Polygonal</a></li>
+          <li><a href="#">Magic Lasso</a></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>Filter</summary>
+        <ul>
+          <li><a href="#">Gaussian</a></li>
+          <li><a href="#">Sobel</a></li>
+          <li><a href="#">Binary</a></li>
+          <li><a href="#">Histogram</a></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>Tools</summary>
+        <ul>
+          <li><a href="#">Brush</a></li>
+          <li><a href="#">Eraser</a></li>
+          <li><a href="#">Bucket</a></li>
+          <li><a href="#">Dropper</a></li>
+          <li class="sep"></li>
+          <li><a href="#">Color</a></li>
+          <li><a href="#">Size</a></li>
+          <li><a href="#">Pattern</a></li>
+          <li><a href="#">Load Pattern Image</a></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>Shapes</summary>
+        <ul>
+          <li><a href="#">Textbox</a></li>
+          <li><a href="#">Rectangle</a></li>
+          <li><a href="#">Ellipse</a></li>
+          <li><a href="#">Line</a></li>
+          <li><a href="#">Polygon</a></li>
+        </ul>
+      </details>
+
+      <details>
+        <summary>Camera</summary>
+        <ul>
+          <li><a href="#">Live Feed</a></li>
+          <li><a href="#">Capture to New Layer</a></li>
+        </ul>
+      </details>
+    </nav>
+
+  </header>
+
+
+  <aside class="toolbar" aria-label="Tools">
+    <button title="Select (Rectangular)">▭</button>
+    <button title="Freeform Select">✏️</button>
+    <button title="Polygonal Select">🔺</button>
+    <button title="Magic Lasso">🪄</button>
+    <hr />
+    <button title="Brush">🖌️</button>
+    <button title="Eraser">🩹</button>
+    <button title="Bucket">🪣</button>
+    <button title="Dropper">🎯</button>
+    <hr />
+    <button title="Textbox">🔤</button>
+    <button title="Shapes">⬛</button>
+  </aside>
+
+
+
+  <main class="canvas-area" aria-label="Canvas area">
+    <div class="canvas-stack">
+      <div class="canvas-placeholder">Canvas Area</div>
+      <div class="zoom-overlay">
+        <div class="zoom">
+          <button title="Zoom out">−</button>
+          <input type="range" min="10" max="400" value="100" />
+          <button title="Zoom in">＋</button>
+          <span class="zoom-value">zoom</span>
+        </div>
+      </div>
+    </div>
+
+    <!--
+  <menu class="context-menu" hidden>
+    <button>Copy</button>
+    <button>Paste</button>
+    <button>Cut</button>
+    <button>Rotate</button>
+    <button>Resize</button>
+    <button>Identify</button>
+  </menu>
+  */-->
+  </main>
+
+
+
+  <aside class="layers-panel" aria-label="Layers">
+    <header class="layers-header">
+      <h2>Layers</h2>
+    </header>
+    <div class="layer-actions">
+      <button title="Add layer">＋</button>
+      <button title="Delete layer">🗑️</button>
+      <button title="Rename layer">✎</button>
+      <button title="Copy layer">⧉</button>
+    </div>
+
+    <ul class="layers-list">
+      <li class="layer-item active">Background</li>
+      <li class="layer-item">Layer 1</li>
+      <li class="layer-item">Layer 2</li>
+    </ul>
+
+    <div class="quick-actions">
+      <button title="Undo">↶</button>
+      <button title="Redo">↷</button>
+    </div>
+  </aside>
+
+
+</body>
+
+</html>
