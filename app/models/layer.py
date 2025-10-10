@@ -1,1 +1,0 @@
-# Define Layer and LayerStack classes. Holds image data, name, opacity, blend mode, etc.

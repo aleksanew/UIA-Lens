@@ -2,3 +2,4 @@ flask
 pillow
 opencv-python
 numpy
+pickle
