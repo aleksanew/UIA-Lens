@@ -1,6 +1,9 @@
 import numpy as np
 import cv2
 
+# Magic lasso is currently not very magic and more just bad, plan to improve it.
+# Tried to snap to edges using Canny, but it's bad.
+
 # Global variables for mouse interaction
 drawing = False
 ix, iy = -1, -1
@@ -14,7 +17,7 @@ def create_mask(height, width):
 
 # Mock process_image: Load from file
 def process_image():
-    img = cv2.imread('tests/text_image.png')
+    img = cv2.imread('tests/test_image2.png')
     if img is None:
         # Fallback to synthetic if file not found
         height, width = 400, 400
@@ -108,7 +111,7 @@ def run_selection(img, title):
                 cv2.fillPoly(mask, [path], 255)
             elif title == 'Magic Lasso':
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                edges = cv2.Canny(gray, 50, 150)
+                edges = cv2.Canny(gray, 100, 150)
                 path = []
                 seed_points = points + [points[0]]  # Close loop
                 for i in range(len(seed_points) - 1):
@@ -119,7 +122,7 @@ def run_selection(img, title):
                     line_path = np.linspace(start_arr, end_arr, num=num_steps, dtype=int)
                     for pt in line_path:
                         snapped = False
-                        for r in range(1, 30):  # Larger radius
+                        for r in range(1, 50):  # Larger radius
                             circle = np.zeros_like(edges)
                             cv2.circle(circle, tuple(pt), r, 255, 1)
                             intersects = cv2.bitwise_and(edges, circle)
