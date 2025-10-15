@@ -59,6 +59,28 @@ async function duplicateLayer(){
     // to manually update html with js now
     location.reload();
 }
+async function renameLayer(){
+    // Get the first element with the class "my-class"
+    const div = document.querySelector(".active");
+    let btn = div.children[0]
+    // Make not ugly
+    const oldName = btn.textContent;
+    let newName = prompt("New name");
+    if (newName === null){
+        btn.textContent = oldName;
+        return
+    }
+    btn.textContent = newName;
+
+    const data = { name: newName };
+    await fetch("/api/v1/layers/rename_layer", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+    })
+}
 
 
 

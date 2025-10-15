@@ -76,4 +76,17 @@ def duplicate_layer():
     stack.save_pickle(f"users/{pid}/layers.pickle")
     return jsonify({"status": "ok"}), 200
 
-# TODO: rename layer
+@bp.post("/rename_layer")
+def rename_layer():
+    pid = session["pid"]
+    stack = LayerStack.LayerStack(0, 0)
+    stack.load_pickle(f"users/{pid}/layers.pickle")
+    try:
+        data = request.get_json()
+        new_name = data.get("name")
+        layer = stack.get_current_layer()
+        layer.rename(new_name)
+        stack.save_pickle(f"users/{pid}/layers.pickle")
+        return jsonify({"status": "ok", "name": new_name}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
