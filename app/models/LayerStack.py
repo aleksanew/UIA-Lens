@@ -1,4 +1,6 @@
-import Layer
+import copy
+import cv2
+from app.models import Layer
 import numpy as np
 import pickle
 
@@ -6,15 +8,21 @@ class LayerStack:
 
     # Creates and selects a white background layer
     def __init__(self, height, width):
-        white_image = np.full((height, width, 4), (255, 255, 255, 255), dtype=np.uint8)
-        background_layer = Layer.Layer("Background", height, width)
-        background_layer.update(white_image)
-        self._layer_array = np.array([background_layer])
+        self._layer_array = np.array([])
         self._height = height
         self._width = width
         self._selected_layer = 0
 
+    # adds background and layer 1
+    def add_base_layers(self):
+        white_image = np.full((self._height, self._width, 4), (255, 255, 255, 255), dtype=np.uint8)
+        background_layer = Layer.Layer("Background", self._height, self._width)
+        background_layer.update(white_image)
+        self._layer_array = np.array([background_layer])
+        self.create_layer()
+
     # Creates and selects a transparent background layer
+    # Currently can produce duplicate layer names if layers have been deleted
     def create_layer(self):
         new_layer_number = np.size(self._layer_array)
         new_layer = Layer.Layer(f"Layer {new_layer_number}", self._height, self._width)
@@ -30,6 +38,12 @@ class LayerStack:
         if i >= np.size(self._layer_array):
             return 0
         return self._layer_array[i]
+
+    def toggle_visible_at(self, i):
+        if i >= np.size(self._layer_array):
+            return False
+        self._layer_array[i].toggle_visible()
+        return True
 
     # Get currently selected layer
     def get_current_layer(self):
@@ -62,6 +76,18 @@ class LayerStack:
         if i >= self._selected_layer:
             i = i-1
         self._layer_array = np.delete(self._layer_array, i)
+
+    # Delete currently selected layer
+    def delete_selected_layer(self):
+        self._layer_array = np.delete(self._layer_array, self._selected_layer)
+        self._selected_layer = np.size(self._layer_array) -1
+
+    # Duplicate currently selected layer
+    def duplicate_selected_layer(self):
+        duplicate = copy.deepcopy(self._layer_array[self._selected_layer])
+        duplicate.rename(f"{duplicate.name()} - copy")
+        self._selected_layer = self._selected_layer + 1
+        self._layer_array = np.insert(self._layer_array, self._selected_layer, duplicate)
 
     # Takes images from all layers and combine them, in order, to a single image
     def get_collapsed_stack_as_image(self):
@@ -111,7 +137,7 @@ class LayerStack:
     # Add/remove depending on what makes sense with load/save implementation
     def save_pickle(self, path):
         try:
-            with open(f"{path}.ual", "wb") as f:
+            with open(f"{path}", "wb") as f:
                 # noinspection PyTypeChecker
                 pickle.dump(self, f)
                 return True
@@ -122,8 +148,6 @@ class LayerStack:
     # Unsure if filetype should be required in path.
     # Add/remove depending on what makes sense with load/save implementation
     def load_pickle(self, path):
-        # Could add check for "ual" filetype,
-        # but code does not actually care about filename
         with open(f"{path}", "rb") as f:
             try:
                 db = pickle.load(f)
@@ -140,7 +164,7 @@ class LayerStack:
             for i, x in enumerate(db._layer_array):
                 h, w, d = x.get_image().shape
                 if (h != db._height) or (w != db._width):
-                    print("height/width mismatch")
+                    print("height or width mismatch")
                     return False
 
             self._layer_array = db._layer_array
@@ -151,5 +175,30 @@ class LayerStack:
                 self._selected_layer = np.size(db._layer_array) - 1
             else:
                 self._selected_layer = db._selected_layer
-
             return True
+
+    # Turns all image arrays into png to display on webpage
+    def create_images_from_layers_at(self, folder):
+        for i, x in enumerate(self._layer_array):
+            cv2.imwrite(f"{folder}/Layer{i}.png", x.get_image())
+
+    # Get object in form of json.
+    # Will only return filename, and not images,
+    # images must be stored first with "create_images_from_layers_at".
+    # If changes are made after creating images, json might be incorrect
+    def get_as_json(self):
+        data = {
+            "selected_layer": self._selected_layer,
+            "height": self._height,
+            "width": self._width,
+            "layers": []
+        }
+
+        for i, x in enumerate(self._layer_array):
+            layer_info = {
+                "name": x.name(),
+                "visible": int(not x.is_hidden()),
+                "filepath": f"Layer{i}.png"
+            }
+            data["layers"].append(layer_info)
+        return data

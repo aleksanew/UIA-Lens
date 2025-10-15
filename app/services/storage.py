@@ -2,9 +2,13 @@
 # Manages folders in app/storage/.
 
 import json, uuid
+import pickle
 from pathlib import Path
 from io import BytesIO
 from PIL import Image
+
+from app.models.LayerStack import LayerStack
+
 
 def _pid() -> str:
     return uuid.uuid4().hex[:8]
