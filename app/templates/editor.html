@@ -106,9 +106,8 @@
   <main class="canvas-area" aria-label="Canvas area">
     <div class="canvas-stack">
     <div class="image-stack" style="width: {{ data.height }}px; height: {{ data.width }}px;">
-
         {% for layer in data.layers %}
-            <img src="{{ layer.filepath }}"
+            <img src="{{ url_for('ui.layer_img', filename=layer.filename) }}"
                  alt="{{ layer.name }}"
                  class="stacked-img"
                  id="layer{{loop.index0}}"
@@ -119,8 +118,6 @@
                 {% endif %}
             >
         {% endfor %}
-
-
     </div>
 
       <div class="zoom-overlay">
@@ -154,7 +151,7 @@
     <div class="layer-actions">
       <button title="Add layer" onclick="addLayer()">＋</button>
       <button title="Delete layer" onclick="deleteLayer()">🗑️</button>
-      <button title="Rename layer">✎</button>
+      <button title="Rename layer" onclick="renameLayer()">✎</button>
       <button title="Copy layer" onclick="duplicateLayer()">⧉</button>
     </div>
 

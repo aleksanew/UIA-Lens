@@ -1,6 +1,8 @@
 # Renders HTML templates (e.g., / → index.html, /editor → editor.html).
+import os
 
-from flask import Blueprint, current_app, jsonify, render_template, session, redirect, url_for
+import numpy as np
+from flask import Blueprint, current_app, jsonify, render_template, session, redirect, url_for, send_from_directory
 
 from app.models import LayerStack
 from app.services import storage
@@ -28,29 +30,37 @@ def routes():
 def index():
     return render_template("index.html")
 
+# Load canvas from user storage, get json from canvas and send to frontend
 @bp.get("/editor")
 def editor():
     pid = session["pid"]
     stack = LayerStack.LayerStack(0, 0)
     stack.load_pickle(f"users/{pid}/layers.pickle")
     data = stack.get_as_json()
-    # TODO: render images
     return render_template("editor.html", data=data)
 
+# Returns path to images in user storage for displaying canvas in frontend
+@bp.get("/layer_img/<filename>")
+def layer_img(filename):
+    pid = session["pid"]
+    user_folder = os.path.join(current_app.root_path, "..", "users", pid, "layers")
+    return send_from_directory(user_folder, filename)
 
+# Create user storage, create empty canvas, add bg and l1,
+# export images to user storage, save canvas in user storage
 @bp.get("/open_new_project")
 def open_new_project():
-    # create empty canvas in new storage folder
-    # save id in session
     pid = storage.new_project("users", "new project")
     session["pid"] = pid
     # TODO: layer size based on user input
     stack = LayerStack.LayerStack(500, 500)
     stack.add_base_layers()
+    stack.create_images_from_layers_at(f"users/{pid}/layers")
     stack.save_pickle(f"users/{pid}/layers.pickle")
     return redirect(url_for("ui.editor"))
 
 
+# TODO: FILE
 @bp.get("/open_loaded_project")
 def open_loaded_project():
     # create empty canvas in new storage folder

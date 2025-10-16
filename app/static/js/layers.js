@@ -87,6 +87,3 @@ async function renameLayer(){
 
 
 
-
-
-

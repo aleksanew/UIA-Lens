@@ -198,7 +198,7 @@ class LayerStack:
             layer_info = {
                 "name": x.name(),
                 "visible": int(not x.is_hidden()),
-                "filepath": f"Layer{i}.png"
+                "filename": f"Layer{i}.png"
             }
             data["layers"].append(layer_info)
         return data
