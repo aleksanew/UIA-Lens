@@ -122,9 +122,9 @@
 
       <div class="zoom-overlay">
         <div class="zoom">
-          <button title="Zoom out">−</button>
+          <button title="Zoom out" data-zoom="out">−</button>
           <input type="range" min="10" max="400" value="100" />
-          <button title="Zoom in">＋</button>
+          <button title="Zoom in" data-zoom="in">＋</button>
           <span class="zoom-value">zoom</span>
         </div>
       </div>
@@ -181,5 +181,6 @@
 
 
 </body>
-    <script src="{{ url_for('static', filename='js/layers.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
 </html>

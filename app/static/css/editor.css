@@ -98,11 +98,16 @@
   align-items: center; 
   justify-content: center;
   position: relative;
+  overflow: auto;
+  cursor: grab;
 }
 .image-stack {
     position: relative;        /* container for absolute positioning */     /* set your desired width */     /* set your desired height */
     border: 1px solid #ccc;    /* optional, to see the container */
     overflow: hidden;           /* crop overflowing parts */
+    transform-origin: 0 0;
+    will-change: transform;
+    transition: transform 0.1s ease-out;
 }
 
 .stacked-img {
