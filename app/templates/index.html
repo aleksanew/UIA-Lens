@@ -1,1 +1,26 @@
-<!-- Landing page — buttons for “New Project” or “Open Editor”. -->
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UIA Lens — Home</title>
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}" />
+
+</head>
+
+<body>
+  <main class="page-home center-screen fade-in">
+    <div class="container">
+      <h1>Welcome to UIA Lens</h1>
+      <div class="buttons">
+        <button onclick="location.href='{{ url_for('ui.open_new_project') }}'">New Project</button>
+        <button onclick="location.href='{{ url_for('ui.open_loaded_project') }}'">Load Project</button>
+      </div>
+    </div>
+  </main>
+</body>
+
+</html>

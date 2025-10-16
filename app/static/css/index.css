@@ -1,0 +1,22 @@
+.page-home {
+}
+
+.page-home .container {
+  text-align: center;
+}
+
+.page-home h1 {
+  margin-bottom: 2rem;
+}
+
+.page-home .buttons {
+  display: flex;
+  gap: 1.5rem;
+  justify-content: center;
+  margin-top: 0.5rem;
+}
+
+.page-home .buttons button {
+  min-width: 180px;
+}
+
