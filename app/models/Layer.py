@@ -27,3 +27,6 @@ class Layer:
 
     def is_hidden(self):
         return not self._visible
+
+    def toggle_visible(self):
+        self._visible = not self._visible

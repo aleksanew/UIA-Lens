@@ -5,8 +5,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>UIA Lens — Editor</title>
-  <link rel="stylesheet" href="../static/css/main.css" />
-  <link rel="stylesheet" href="../static/css/editor.css" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}" />
 </head>
 
 
@@ -105,7 +105,21 @@
 
   <main class="canvas-area" aria-label="Canvas area">
     <div class="canvas-stack">
-      <div class="canvas-placeholder">Canvas Area</div>
+    <div class="image-stack" style="width: {{ data.height }}px; height: {{ data.width }}px;">
+        {% for layer in data.layers %}
+            <img src="{{ url_for('ui.layer_img', filename=layer.filename) }}"
+                 alt="{{ layer.name }}"
+                 class="stacked-img"
+                 id="layer{{loop.index0}}"
+                {% if layer.visible == 1 %}
+                style="visibility: visible;"
+                {% else %}
+                style="visibility: hidden;"
+                {% endif %}
+            >
+        {% endfor %}
+    </div>
+
       <div class="zoom-overlay">
         <div class="zoom">
           <button title="Zoom out">−</button>
@@ -135,17 +149,29 @@
       <h2>Layers</h2>
     </header>
     <div class="layer-actions">
-      <button title="Add layer">＋</button>
-      <button title="Delete layer">🗑️</button>
-      <button title="Rename layer">✎</button>
-      <button title="Copy layer">⧉</button>
+      <button title="Add layer" onclick="addLayer()">＋</button>
+      <button title="Delete layer" onclick="deleteLayer()">🗑️</button>
+      <button title="Rename layer" onclick="renameLayer()">✎</button>
+      <button title="Copy layer" onclick="duplicateLayer()">⧉</button>
     </div>
 
-    <ul class="layers-list">
-      <li class="layer-item active">Background</li>
-      <li class="layer-item">Layer 1</li>
-      <li class="layer-item">Layer 2</li>
-    </ul>
+    <div class="layers-list" id="layer_list">
+        {% for layer in data.layers %}
+        <div class="layer-item {% if data.selected_layer==loop.index0 %}active{% endif %}">
+            <button class="layer-name" onclick="setActive(this.parentElement, {{ loop.index0 }})">
+                {{ layer.name }}
+            </button>
+            <button class="layer-hide" onclick="toggleVisibility(this, {{ loop.index0 }})">
+                {% if layer.visible == 1 %}
+                👁️
+                {% else %}
+                🚫
+                {% endif %}
+            </button>
+        </div>
+        {% endfor %}
+
+    </div>
 
     <div class="quick-actions">
       <button title="Undo">↶</button>
@@ -155,5 +181,5 @@
 
 
 </body>
-
+    <script src="{{ url_for('static', filename='js/layers.js') }}"></script>
 </html>
