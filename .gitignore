@@ -4,3 +4,4 @@ app/storage/*
 !app/storage/.gitkeep
 venv/
 .env
+/users
