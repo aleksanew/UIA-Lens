@@ -234,3 +234,18 @@
   justify-content: center;    
   margin-top: 5px;              
 }
+
+.image-stack { position: relative; }
+#paint-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+
+[data-tool].active {
+  border: 2px solid #007bff;
+  box-shadow: 0 0 8px rgba(0, 123, 255, 0.5);
+  transform: scale(1.05);
+}
