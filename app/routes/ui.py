@@ -33,9 +33,7 @@ def index():
 # Load canvas from user storage, get json from canvas and send to frontend
 @bp.get("/editor")
 def editor():
-    pid = session["pid"]
-    stack = LayerStack.LayerStack(0, 0)
-    stack.load_pickle(f"users/{pid}/layers.pickle")
+    stack = storage.load_layers()
     data = stack.get_as_json()
     return render_template("editor.html", data=data)
 

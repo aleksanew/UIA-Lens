@@ -96,6 +96,7 @@
     <button data-tool="bucket" title="Bucket">🪣</button>
     <button data-tool="dropper" title="Dropper">🎯</button>
     <hr />
+    <button data-tool="filters" title="Filters" onclick="showFilterOptions(this)">✨</button>
     <button data-tool="textbox" title="Textbox">🔤</button>
     <button data-tool="shapes" title="Shapes">⬛</button>
   </aside>
@@ -182,5 +183,6 @@
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/paint.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/filters.js') }}" defer></script>
 
 </html>

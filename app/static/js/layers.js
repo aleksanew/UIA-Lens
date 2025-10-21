@@ -60,7 +60,7 @@ async function duplicateLayer(){
     location.reload();
 }
 async function renameLayer(){
-    // Get the first element with the class "my-class"
+    // Get the first element with the class "active"
     const div = document.querySelector(".active");
     let btn = div.children[0]
     // Make not ugly

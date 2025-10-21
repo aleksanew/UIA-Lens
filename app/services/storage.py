@@ -6,8 +6,8 @@ import pickle
 from pathlib import Path
 from io import BytesIO
 from PIL import Image
-
-from app.models.LayerStack import LayerStack
+from flask import session
+from app.models import LayerStack
 
 
 def _pid() -> str:
@@ -33,4 +33,12 @@ def save_project(root: str, meta: dict) -> None:
     p = Path(root) / meta["id"] / "project.json"
     p.write_text(json.dumps(meta))
 
-# Legg til flere etterhvert
+def load_layers() -> LayerStack.LayerStack:
+    pid = session["pid"]
+    stack = LayerStack.LayerStack(0, 0)
+    stack.load_pickle(f"users/{pid}/layers.pickle")
+    return stack
+
+def save_layers(stack: LayerStack.LayerStack) -> None:
+    pid = session["pid"]
+    stack.save_pickle(f"users/{pid}/layers.pickle")
