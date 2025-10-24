@@ -16,13 +16,13 @@
       <details>
         <summary>File</summary>
         <ul>
-          <li><a href="#">New</a></li>
-          <li><a href="#">Open</a></li>
-          <li><a href="#">Save</a></li>
-          <li><a href="#">Save As…</a></li>
-          <li><a href="#">Properties</a></li>
+          <li><a href="#" id="file-new">New</a></li>
+          <li><a href="#" id="file-open-local">Open (from computer)</a></li>
+          <li><a href="#" id="file-open-storage">Open (from storage)</a></li>
           <li class="sep"></li>
-          <li><a href="#">Quit</a></li>
+          <li><a href="#" id="file-save-as">Save As…</a></li>
+          <li class="sep"></li>
+          <li><a href="/api/v1/files/export?type=zip">Export Project (.zip)</a></li>
         </ul>
       </details>
 
@@ -176,11 +176,22 @@
       <span id="size-value">10</span>
     </div>
 
+    <section class="storage-projects" aria-label="Projects in storage">
+      <header class="projects-header">
+        <h3>Projects</h3>
+        <button id="projects-refresh" title="Refresh list">↻</button>
+      </header>
+      <div id="projects-list" class="projects-list" aria-live="polite">
+      </div>
+    </section>
+
   </aside>
 
 </body>
+<input type="file" id="file-open-input" hidden />
 <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
 <script src="{{ url_for('static', filename='js/paint.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/fileops.js') }}" defer></script>
 
 </html>

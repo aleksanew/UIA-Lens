@@ -35,7 +35,8 @@ def index():
 def editor():
     pid = session["pid"]
     stack = LayerStack.LayerStack(0, 0)
-    stack.load_pickle(f"users/{pid}/layers.pickle")
+    storage_root = current_app.config.get("STORAGE_ROOT")
+    stack.load_pickle(f"{storage_root}/{pid}/layers.pickle")
     data = stack.get_as_json()
     return render_template("editor.html", data=data)
 
@@ -43,20 +44,20 @@ def editor():
 @bp.get("/layer_img/<filename>")
 def layer_img(filename):
     pid = session["pid"]
-    user_folder = os.path.join(current_app.root_path, "..", "users", pid, "layers")
+    user_folder = os.path.join(current_app.config.get("STORAGE_ROOT"), pid, "layers")
     return send_from_directory(user_folder, filename)
 
 # Create user storage, create empty canvas, add bg and l1,
 # export images to user storage, save canvas in user storage
 @bp.get("/open_new_project")
 def open_new_project():
-    pid = storage.new_project("users", "new project")
+    pid = storage.new_project(current_app.config.get("STORAGE_ROOT"), "new project")
     session["pid"] = pid
     # TODO: layer size based on user input
     stack = LayerStack.LayerStack(500, 500)
     stack.add_base_layers()
-    stack.create_images_from_layers_at(f"users/{pid}/layers")
-    stack.save_pickle(f"users/{pid}/layers.pickle")
+    stack.create_images_from_layers_at(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers")
+    stack.save_pickle(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers.pickle")
     return redirect(url_for("ui.editor"))
 
 
