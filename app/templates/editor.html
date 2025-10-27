@@ -90,10 +90,48 @@
     <button data-tool="polygoanl_select" title="Polygonal Select">🔺</button>
     <button data-tool="magic_lasso" title="Magic Lasso">🪄</button>
     <hr />
-    <button data-tool="brush" title="Brush">🖌️</button>
-    <input type="color" id="color-picker" value="#ff0000" hidden />
-    <button data-tool="eraser" title="Eraser">🩹</button>
+
+    <div class="tool-container">
+      <button data-tool="brush" title="Brush">🖌️</button>
+      <div class="brush-popup" id="brush-popup">
+        <div class="brush-popup-item">
+          <label>Color</label>
+          <input type="color" id="color-picker" value="#ff0000" />
+        </div>
+        <div class="brush-popup-item">
+          <div class="size-display">
+            <span>Size</span>
+            <span class="size-value" id="size-value">10</span>
+          </div>
+          <input type="range" id="size-slider" min="1" max="100" value="10" />
+        </div>
+        <div class="brush-popup-item">
+          <label>Type</label>
+          <select id="brush-type-select">
+            <option value="hard">Hard</option>
+            <option value="chalk">Chalk</option>
+            <option value="star">Star</option>
+            <option value="watercolor">Watercolor</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="tool-container">
+      <button data-tool="eraser" title="Eraser">🩹</button>
+      <div class="eraser-popup" id="eraser-popup">
+        <div class="brush-popup-item">
+          <div class="size-display">
+            <span>Size</span>
+            <span class="size-value" id="eraser-size-value">10</span>
+          </div>
+          <input type="range" id="eraser-size-slider" min="1" max="100" value="10" />
+        </div>
+      </div>
+    </div>
+
     <button data-tool="bucket" title="Bucket">🪣</button>
+    <input type="color" id="bucket-color-picker" value="#00ff00" style="display:none;" />
     <button data-tool="dropper" title="Dropper">🎯</button>
     <hr />
     <button data-tool="textbox" title="Textbox">🔤</button>
@@ -121,17 +159,6 @@
         </div>
       </div>
     </div>
-
-    <!--
-  <menu class="context-menu" hidden>
-    <button>Copy</button>
-    <button>Paste</button>
-    <button>Cut</button>
-    <button>Rotate</button>
-    <button>Resize</button>
-    <button>Identify</button>
-  </menu>
-  */-->
   </main>
 
   <aside class="layers-panel" aria-label="Layers">
@@ -160,20 +187,11 @@
         </button>
       </div>
       {% endfor %}
-
     </div>
 
     <div class="quick-actions">
       <button title="Undo">↶</button>
       <button title="Redo">↷</button>
-    </div>
-    <hr />
-    <div class="tool-settings">
-      <p>Brush and Eraser size:</p>
-
-      <label for="size-slider">Size:</label>
-      <input type="range" id="size-slider" min="1" max="100" value="10">
-      <span id="size-value">10</span>
     </div>
 
   </aside>
