@@ -9,8 +9,6 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}" />
 </head>
 
-
-
 <body class="page-editor">
   <header class="menubar">
     <div class="brand">UIA Lens</div>
@@ -18,13 +16,13 @@
       <details>
         <summary>File</summary>
         <ul>
-          <li><a href="#">New</a></li>
-          <li><a href="#">Open</a></li>
-          <li><a href="#">Save</a></li>
-          <li><a href="#">Save As…</a></li>
-          <li><a href="#">Properties</a></li>
+          <li><a href="#" id="file-new">New</a></li>
+          <li><a href="#" id="file-open-local">Open (from computer)</a></li>
+          <li><a href="#" id="file-open-storage">Open (from storage)</a></li>
           <li class="sep"></li>
-          <li><a href="#">Quit</a></li>
+          <li><a href="#" id="file-save-as">Save As…</a></li>
+          <li class="sep"></li>
+          <li><a href="/api/v1/files/export?type=zip">Export Project (.zip)</a></li>
         </ul>
       </details>
 
@@ -87,38 +85,32 @@
 
 
   <aside class="toolbar" aria-label="Tools">
-    <button title="Select (Rectangular)">▭</button>
-    <button title="Freeform Select">✏️</button>
-    <button title="Polygonal Select">🔺</button>
-    <button title="Magic Lasso">🪄</button>
+    <button data-tool="rectangular" title="Select (Rectangular)">▭</button>
+    <button data-tool="freeform_select" title="Freeform Select">✏️</button>
+    <button data-tool="polygoanl_select" title="Polygonal Select">🔺</button>
+    <button data-tool="magic_lasso" title="Magic Lasso">🪄</button>
     <hr />
-    <button title="Brush">🖌️</button>
-    <button title="Eraser">🩹</button>
-    <button title="Bucket">🪣</button>
-    <button title="Dropper">🎯</button>
+    <button data-tool="brush" title="Brush">🖌️</button>
+    <input type="color" id="color-picker" value="#ff0000" hidden />
+    <button data-tool="eraser" title="Eraser">🩹</button>
+    <button data-tool="bucket" title="Bucket">🪣</button>
+    <button data-tool="dropper" title="Dropper">🎯</button>
     <hr />
-    <button title="Textbox">🔤</button>
-    <button title="Shapes">⬛</button>
+    <button data-tool="textbox" title="Textbox">🔤</button>
+    <button data-tool="shapes" title="Shapes">⬛</button>
   </aside>
-
 
 
   <main class="canvas-area" aria-label="Canvas area">
     <div class="canvas-stack">
-    <div class="image-stack" style="width: {{ data.height }}px; height: {{ data.width }}px;">
+      <div class="image-stack" style="width: {{ data.width }}px; height: {{ data.height }}px;">
         {% for layer in data.layers %}
-            <img src="{{ url_for('ui.layer_img', filename=layer.filename) }}"
-                 alt="{{ layer.name }}"
-                 class="stacked-img"
-                 id="layer{{loop.index0}}"
-                {% if layer.visible == 1 %}
-                style="visibility: visible;"
-                {% else %}
-                style="visibility: hidden;"
-                {% endif %}
-            >
+        <img src="{{ url_for('ui.layer_img', filename=layer.filename) }}" alt="{{ layer.name }}" class="stacked-img"
+          id="layer{{loop.index0}}" {% if layer.visible==1 %} style="visibility: visible;" {% else %}
+          style="visibility: hidden;" {% endif %}>
         {% endfor %}
-    </div>
+        <canvas id="paint-overlay" width="{{ data.width }}" height="{{ data.height }}"></canvas>
+      </div>
 
       <div class="zoom-overlay">
         <div class="zoom">
@@ -142,8 +134,6 @@
   */-->
   </main>
 
-
-
   <aside class="layers-panel" aria-label="Layers">
     <header class="layers-header">
       <h2>Layers</h2>
@@ -156,20 +146,20 @@
     </div>
 
     <div class="layers-list" id="layer_list">
-        {% for layer in data.layers %}
-        <div class="layer-item {% if data.selected_layer==loop.index0 %}active{% endif %}">
-            <button class="layer-name" onclick="setActive(this.parentElement, {{ loop.index0 }})">
-                {{ layer.name }}
-            </button>
-            <button class="layer-hide" onclick="toggleVisibility(this, {{ loop.index0 }})">
-                {% if layer.visible == 1 %}
-                👁️
-                {% else %}
-                🚫
-                {% endif %}
-            </button>
-        </div>
-        {% endfor %}
+      {% for layer in data.layers %}
+      <div class="layer-item {% if data.selected_layer==loop.index0 %}active{% endif %}">
+        <button class="layer-name" onclick="setActive(this.parentElement, {{ loop.index0 }})">
+          {{ layer.name }}
+        </button>
+        <button class="layer-hide" onclick="toggleVisibility(this, {{ loop.index0 }})">
+          {% if layer.visible == 1 %}
+          👁️
+          {% else %}
+          🚫
+          {% endif %}
+        </button>
+      </div>
+      {% endfor %}
 
     </div>
 
@@ -177,10 +167,31 @@
       <button title="Undo">↶</button>
       <button title="Redo">↷</button>
     </div>
+    <hr />
+    <div class="tool-settings">
+      <p>Brush and Eraser size:</p>
+
+      <label for="size-slider">Size:</label>
+      <input type="range" id="size-slider" min="1" max="100" value="10">
+      <span id="size-value">10</span>
+    </div>
+
+    <section class="storage-projects" aria-label="Projects in storage">
+      <header class="projects-header">
+        <h3>Projects</h3>
+        <button id="projects-refresh" title="Refresh list">↻</button>
+      </header>
+      <div id="projects-list" class="projects-list" aria-live="polite">
+      </div>
+    </section>
+
   </aside>
 
-
 </body>
-    <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
-    <script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
+<input type="file" id="file-open-input" hidden />
+<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/paint.js') }}" defer></script>
+<script src="{{ url_for('static', filename='js/fileops.js') }}" defer></script>
+
 </html>
