@@ -1,15 +1,15 @@
 // For some reason, default option isn't selected by default
-document.getElementById('filterSelected').selectedIndex = 0;
+document.getElementById("filterSelected").selectedIndex = 0;
 
 const filterButton = document.getElementById("filterButton");
 // Observe changes on element
 const observer = new MutationObserver(mutations => {
     mutations.forEach(mutation => {
-        if (mutation.attributeName === 'class') {
-            if (filterButton.classList.contains('active')) {
-                document.querySelector('.filter-option-container').style.display = 'block';
+        if (mutation.attributeName === "class") {
+            if (filterButton.classList.contains("active")) {
+                document.querySelector(".filter-option-container").style.display = "block";
             } else {
-                document.querySelector('.filter-option-container').style.display = 'none';
+                document.querySelector(".filter-option-container").style.display = "none";
             }
         }
     });
@@ -24,7 +24,7 @@ slider.addEventListener("input", () => {
   label.textContent = "K: " + slider.value;
 });
 
-function reloadImage(){
+function reloadActiveImage(){
     // Temporary implementation
     location.reload();
 }
@@ -52,7 +52,7 @@ async function hueShift(event){
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 async function grayscale(event){
@@ -60,7 +60,7 @@ async function grayscale(event){
     await fetch("/api/v1/filters/grayscale", {
         method: "POST"
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 async function featureDetection(event){
@@ -76,7 +76,7 @@ async function featureDetection(event){
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 
@@ -92,7 +92,7 @@ async function edgeDetection(event){
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 // Disable thresh input for algorithms that don't use it
@@ -122,7 +122,7 @@ async function thresholding(event) {
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 async function gaussBlur(event) {
@@ -140,7 +140,7 @@ async function gaussBlur(event) {
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 async function medianBlur(event) {
@@ -155,7 +155,7 @@ async function medianBlur(event) {
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 async function bilateralBlur(event) {
@@ -172,7 +172,7 @@ async function bilateralBlur(event) {
         },
         body: JSON.stringify(data)
     });
-    reloadImage()
+    reloadActiveImage()
 }
 
 createMatrix();
@@ -180,12 +180,12 @@ function createMatrix(){
     let n = document.getElementById("nMatrix").value;
     let m = document.getElementById("mMatrix").value;
 
-    const matrix = document.getElementById('matrix');
+    const matrix = document.getElementById("matrix");
     matrix.innerHTML = "";
     matrix.style.gridTemplateColumns = "repeat(" + n + ", auto)";
 
     for (let i = 0; i < n * m; i++) {
-        const input = document.createElement('input');
+        const input = document.createElement("input");
         input.type = "number";
         input.required = true;
         input.value = "1";
@@ -222,7 +222,7 @@ async function customKernel(event) {
     //     },
     //     body: JSON.stringify(data)
     // });
-    // reloadImage()
+    // reloadActiveImage()
 }
 
 

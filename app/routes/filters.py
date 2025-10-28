@@ -196,7 +196,7 @@ def median_blur():
         return jsonify({"status": "ok"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-# TODO: check for odd for ba and fr
+
 @bp.post("/bilateral_blur")
 def bilateral_blur():
     try:
