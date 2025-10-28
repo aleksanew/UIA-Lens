@@ -18,7 +18,7 @@ def hue_shift():
         img = layer.get_image()
         img = filter.hue_shift(img, value)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
 
@@ -32,7 +32,7 @@ def grayscale():
     img = layer.get_image()
     img = filter.grayscale(img)
     layer.update(img)
-    stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+    stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
     storage.save_layers(stack)
     return jsonify({"status": "ok"}), 200
 
@@ -63,7 +63,7 @@ def feature_detection():
         img = layer.get_image()
         img = filter.feature_detection(img, block_size, ksize, k)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
 
@@ -91,7 +91,7 @@ def edge_detection():
         else:
             return jsonify({"status": "Invalid algorithm"}), 400
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
 
@@ -117,7 +117,7 @@ def kernel_filter():
         img = layer.get_image()
         img = filter.kernel_filter(img, kernel)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
 
@@ -143,7 +143,7 @@ def threshold():
         img = layer.get_image()
         img = filter.threshold(img, thresh_type, thresh)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
 
@@ -171,7 +171,7 @@ def gauss_blur():
         img = layer.get_image()
         img = filter.gauss_blur(img, (ksize_1, ksize_2), sigma_x, sigma_y)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
     except Exception as e:
@@ -191,7 +191,7 @@ def median_blur():
         img = layer.get_image()
         img = filter.median_blur(img, ksize)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
     except Exception as e:
@@ -217,7 +217,7 @@ def bilateral_blur():
         img = layer.get_image()
         img = filter.bilateral_blur(img, d, sigma_color, sigma_space)
         layer.update(img)
-        stack.create_image_from_selected_layers_at(f"users/{session["pid"]}/layers")
+        stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
         storage.save_layers(stack)
         return jsonify({"status": "ok"}), 200
     except Exception as e:
