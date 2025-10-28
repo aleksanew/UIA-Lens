@@ -63,8 +63,24 @@ def canny_edge(img):
     canny = cv2.Canny(gray, threshold1=100, threshold2=200)
     return cv2.cvtColor(canny, cv2.COLOR_GRAY2BGRA)
 
-def blur(img, ksize: tuple[int, int], sigma_x: float, sigma_y: float = 0):
+def gauss_blur(img, ksize: tuple[int, int], sigma_x: float, sigma_y: float = 0):
+    if not (ksize[0] > 0 and ksize[0] % 2 == 1 and ksize[1] > 0 and ksize[1] % 2 == 1):
+        return img
+
     return cv2.GaussianBlur(img, ksize, sigmaX=sigma_x, sigmaY=sigma_y)
+
+def median_blur(img, ksize: int):
+    if not (ksize > 0 and ksize % 2 == 1):
+        return img
+    return cv2.medianBlur(img, ksize)
+
+def bilateral_blur(img, d, sigma_color: int, sigma_space: int):
+    # Large d values tanks performance and are not that useful anyway
+    if d > 10:
+        d = 10
+    img = cv2.cvtColor(img.copy(), cv2.COLOR_BGRA2BGR)
+    img = cv2.bilateralFilter(img, d, sigma_color, sigma_space)
+    return cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
 
 def kernel_filter(img, kernel:np.ndarray):
     return cv2.filter2D(img, -1, kernel)

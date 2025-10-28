@@ -331,3 +331,83 @@
   border: none;
   outline: none;
 }
+
+
+
+.filter-container {
+    display: flex;
+    align-items: center;
+    position: relative;
+}
+
+
+.filter-option-container {
+    display: none;
+    position: absolute;
+    left: 100%;
+    bottom: 0;
+    margin-left: 0.5rem;
+    background-color: var(--bg-2);
+    border: 1px solid var(--ui-1);
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: 0 6px 15px rgba(0,0,0,0.4);
+    width: 220px;
+    z-index: 10;
+}
+
+.filter-option-container.active {
+    display: block;
+}
+
+.filter-option{
+    overflow-x: auto;
+}
+
+.filter-select,
+.filter-option input,
+.filter-option label {
+    width: 100%;
+    color: var(--fg-1);
+    background-color: var(--ui-1);
+    border: none;
+    border-radius: 5px;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+}
+
+.filter-option input[type="submit"] {
+    background-color: var(--brand);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.filter-option input[type="submit"]:hover {
+    background-color: #1d4ed8;
+}
+
+.matrix {
+    display: grid;
+    background-color: var(--bg-2);
+}
+
+/* Disables up/down arrows in input field*/
+/* Chrome, Safari, Edge, Opera */
+.no-arrow input::-webkit-outer-spin-button,
+.no-arrow input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+/* Disables up/down arrows in input field*/
+/* Firefox */
+.no-arrow input[type=number] {
+  -moz-appearance: textfield;
+}
+
+.matrix input {
+    width: 1.5rem;
+    height: 1.5rem;
+    text-align: center;
+}
