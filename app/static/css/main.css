@@ -70,3 +70,20 @@ footer {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+
+/* home layout */
+.page-home{ min-height: 100vh; display: grid; place-items: center; }
+.home-layout{
+  width: min(1100px, 92vw);
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 2rem;
+}
+.home-hero{ display: grid; place-items: center; gap: 1rem; }
+.home-hero .buttons{ display: flex; gap: 1rem; margin-top: .5rem; }
+.home-projects{ align-self: center; background: rgba(255,255,255,0.02); border: 1px solid var(--ui-1); border-radius: .75rem; padding: 1rem; }
+.home-projects .projects-header{ display: flex; align-items: center; justify-content: space-between; margin-bottom: .5rem; }
+.projects-list{ display: grid; gap: .5rem; max-height: 380px; overflow: auto; }
+.project-item{ text-align: left; padding: .5rem .75rem; background: var(--ui-1); border-radius: .4rem; }
+.project-item:hover{ background: var(--brand); }
+.projects-empty, .projects-error{ opacity: .8; font-size: .9rem; }
