@@ -12,15 +12,29 @@
 </head>
 
 <body>
-  <main class="page-home center-screen fade-in">
-    <div class="container">
-      <h1>Welcome to UIA Lens</h1>
-      <div class="buttons">
-        <button onclick="location.href='{{ url_for('ui.open_new_project') }}'">New Project</button>
-        <button onclick="location.href='{{ url_for('ui.open_loaded_project') }}'">Load Project</button>
-      </div>
+  <main class="page-home fade-in">
+    <div class="home-layout">
+      <section class="home-hero">
+        <h1>Welcome to UIA Lens</h1>
+        <div class="buttons">
+          <button onclick="location.href='{{ url_for('ui.open_new_project') }}'">New Project</button>
+          <button id="home-open-local">Load Project</button>
+        </div>
+      </section>
+
+      <aside class="home-projects" aria-label="Projects">
+        <header class="projects-header">
+          <h2>Projects</h2>
+          <button id="home-projects-refresh" title="Refresh list">↻</button>
+        </header>
+        <div id="home-projects-list" class="projects-list" aria-live="polite"></div>
+      </aside>
     </div>
   </main>
+
+  <input type="file" id="home-open-input" hidden />
 </body>
+
+<script src="{{ url_for('static', filename='js/home.js') }}" defer></script>
 
 </html>

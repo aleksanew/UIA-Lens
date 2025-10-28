@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, session
+from flask import Blueprint, jsonify, request, session, current_app
 from app.models.LayerStack import LayerStack
 from app.services.tools import tool_brush, tool_eraser, tool_bucket
 import os
@@ -8,8 +8,11 @@ import numpy as np
 bp = Blueprint("tools", __name__)
 
 # Load LayerStack, validate selected layer
+def _root() -> str:
+    return current_app.config.get("STORAGE_ROOT")
+
 def _get_layer_stack(pid):
-    pickle_path = os.path.join("users", pid, "layers.pickle")
+    pickle_path = os.path.join(_root(), pid, "layers.pickle")
     if not os.path.exists(pickle_path):
         return None, jsonify({"error": f"Layer stack not found: {pickle_path}"}), 404
     
@@ -24,7 +27,7 @@ def _get_layer_stack(pid):
 
 # Ensure layer PNG exists, create if missing
 def _ensure_layer_png(pid, stack, idx):
-    layers_dir = os.path.join("users", pid, "layers")
+    layers_dir = os.path.join(_root(), pid, "layers")
     os.makedirs(layers_dir, exist_ok=True)
     layer_path = os.path.join(layers_dir, f"Layer{idx}.png")
     
@@ -101,7 +104,7 @@ def stroke():
         return jsonify({"error": f"Tool '{tool}' failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join("users", pid, "layers.pickle")
+    pickle_path = os.path.join(_root(), pid, "layers.pickle")
     return _update_and_save(stack, layer_path, pickle_path)
 
 
@@ -145,5 +148,5 @@ def bucket_fill():
         return jsonify({"error": f"Bucket failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join("users", pid, "layers.pickle")
+    pickle_path = os.path.join(_root(), pid, "layers.pickle")
     return _update_and_save(stack, layer_path, pickle_path)
