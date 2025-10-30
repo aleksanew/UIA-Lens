@@ -1,14 +1,13 @@
 const canvas = document.getElementById("paint-overlay");
-const ctx = canvas.getContext("2d", { alpha: true });
-const colorPicker = document.getElementById("color-picker");
+const ctx = canvas.getContext("2d", { alpha: true });const colorPicker = document.getElementById("color-picker");
 const sizeSlider = document.getElementById("size-slider");
 const sizeValue = document.getElementById("size-value");
-const brushTypeSelect = document.getElementById("brush-type-select");
-const brushPopup = document.getElementById("brush-popup");
-const eraserPopup = document.getElementById("eraser-popup");
-const eraserSizeSlider = document.getElementById("eraser-size-slider");
-const eraserSizeValue = document.getElementById("eraser-size-value");
 const bucketColorPicker = document.getElementById("bucket-color-picker");
+const brushPopup        = document.getElementById("brush-popup");
+const eraserPopup       = document.getElementById("eraser-popup");
+const eraserSizeSlider  = document.getElementById("eraser-size-slider");
+const eraserSizeValue   = document.getElementById("eraser-size-value");
+const brushTypeSelect   = document.getElementById("brush-type-select");
 
 
 let state = {
@@ -26,7 +25,23 @@ let state = {
   currentStamp: null,
 };
 
+state.shape = {
+    mode: 'rect',
+    start: null,
+    points: []
+};
+
+state.text = {
+    color: '#000000',
+    size: 1.2,
+    thickness: 2,
+    font: 'sans',
+    align: 'left'
+};
+
+state.shape.fillEnabled = true;
 const BRUSH_SPACING = { default: 0.25, star: 3 };
+const currentSize = () => (state.tool === "eraser" ? state.eraserSize : state.brushSize);
 
 function setupCanvas() {
   const dpr = window.devicePixelRatio || 1;
@@ -94,7 +109,7 @@ function gaussianBlurStamp(stamp, kernelSize, sigma) {
   const size = stamp.length;
   const half = Math.floor(kernelSize / 2);
 
-  // Generate Gaussian kernel 
+  // Generate Gaussian kernel
   const kernel = [];
   let kernelSum = 0;
   for (let y = -half; y <= half; y++) {
@@ -226,7 +241,7 @@ function createStarStamp(size) {
   return stamp;
 }
 
-// UTILS 
+// UTILS
 function hexToRgb(hex) {
   hex = hex.replace("#", "");
   if (hex.length === 3) hex = hex.split("").map((c) => c + c).join("");
@@ -341,7 +356,7 @@ function getCanvasXY(e) {
   const cssWidth = canvas.width / dpr;
   const cssHeight = canvas.height / dpr;
 
-  // Convert from 
+  // Convert from
   const scaleX = cssWidth / rect.width;
   const scaleY = cssHeight / rect.height;
 
@@ -370,6 +385,90 @@ function reloadImage() {
   imgEl.src = `${base}?t=${Date.now()}`;
 }
 
+function drawPreviewRect(a, b) {
+  ctx.clearRect(0,0, canvas.width, canvas.height);
+  const x0 = Math.min(a.x, b.x), y0 = Math.min(a.y, b.y);
+  const w = Math.abs(b.x - a.x), h = Math.abs(b.y - a.y);
+  ctx.save();
+  ctx.lineWidth = currentSize();
+  ctx.strokeStyle = state.colors.brush;
+  if (state.shape.fillEnabled) {
+    ctx.fillStyle = state.colors.bucket;
+    ctx.fillRect(x0, y0, w, h);
+  }
+  ctx.strokeRect(x0, y0, w, h);
+  ctx.restore();
+}
+
+function drawPreviewEllipse(a, b) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
+  const rx = Math.abs(b.x - a.x) / 2, ry = Math.abs(b.y - a.y) / 2;
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  if (state.shape.fillEnabled) {
+    ctx.fillStyle = state.colors.bucket;
+    ctx.fill();
+  }
+  ctx.lineWidth = currentSize();
+  ctx.strokeStyle = state.colors.brush;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPreviewPolygon(points) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  if (points.length < 2) return;
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(points[0].x, points[0].y);
+  for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+  ctx.closePath();
+  if (state.shape.fillEnabled) {
+    ctx.fillStyle = state.colors.bucket;
+    ctx.fill();
+  }
+  ctx.lineWidth = currentSize();
+  ctx.strokeStyle = state.colors.brush;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawPreviewLine(a, b) {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.lineWidth = currentSize();
+  ctx.strokeStyle = state.colors.brush;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function cycleShapeMode() {
+    const order = [ 'rect', 'ellipse', 'line', 'polygon'];
+    const i = order.indexOf(state.shape.mode);
+    state.shape.mode = order[(i+1) % order.length];
+}
+
+// Drawing
+function setupStroke() {
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = currentSize();
+  ctx.strokeStyle = state.tool === "eraser" ? "#ffffff" : state.colors[state.tool];
+}
+
+function updateShapeUI() {
+  const btn = document.querySelector('[data-tool="shapes"]');
+  if (!btn) return;
+  const mode = state.shape.mode;
+  const fill = state.shape.fillEnabled ? "Fill ON" : "Fill OFF";
+  btn.title = `Shapes: ${mode}  •  ${fill}\n(Click to select, click again to cycle)`;
+  btn.textContent = state.shape.fillEnabled ? "⬛" : "⬜";
+}
 
 const STAMP_FACTORIES = {
   chalk: createChalkStamp,
@@ -443,6 +542,42 @@ async function postJSON(url, payload) {
   const ct = res.headers.get("content-type") || "";
   return ct.includes("json") ? res.json() : null;
 }
+
+//API Callss
+async function sendShape(payload) {
+    try {
+        const res = await fetch("/api/v1/tools/shape", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            console.error("Shape failed:", await res.text());
+            return;
+        }
+    } catch (err) {
+        console.error("Shape fetch error:", err);
+    }
+    reloadImage();
+}
+
+async function sendText(payload) {
+    try {
+        const res = await fetch("/api/v1/tools/text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+            console.error("Text failed:", await res.text());
+            return;
+        }
+    } catch (err) {
+        console.error("Text fetch error:", err);
+    }
+    reloadImage();
+}
+
 
 async function sendStroke() {
   if (!state.points.length) return;
@@ -521,6 +656,16 @@ function setActiveTool(tool) {
   if ((tool === "brush" || tool === "bucket") && colorPicker) {
     colorPicker.value = state.colors[tool];
   }
+
+  if (tool === "textbox" && colorPicker) {
+    colorPicker.value = state.text.color;
+    colorPicker.click();
+  }
+
+
+  if (tool === "shapes") {
+    updateShapeUI();
+  }
 }
 
 function showOnlyPopup(which) {
@@ -532,12 +677,12 @@ function showOnlyPopup(which) {
 // event listeners
 document.addEventListener("click", (e) => {
   const btn = e.target.closest("[data-tool]");
-
   if (!btn) {
-    if (!e.target.closest('[data-tool="brush"]') && !brushPopup?.contains(e.target)) {
+    // clicks outside: hide popups
+    if (!e.target.closest('[data-tool="brush"]') && !brushPopup?.contains?.(e.target)) {
       brushPopup?.classList.remove("show");
     }
-    if (!e.target.closest('[data-tool="eraser"]') && !eraserPopup?.contains(e.target)) {
+    if (!e.target.closest('[data-tool="eraser"]') && !eraserPopup?.contains?.(e.target)) {
       eraserPopup?.classList.remove("show");
     }
     return;
@@ -545,13 +690,24 @@ document.addEventListener("click", (e) => {
 
   const tool = btn.dataset.tool;
 
+  if (tool === "shapes") {
+    if (state.tool === "shapes") {
+      cycleShapeMode();
+      updateShapeUI();
+    } else {
+      setActiveTool("shapes");
+    }
+    return;
+  }
+
   if (tool === "brush") {
     if (state.tool === "brush") {
       brushPopup?.classList.toggle("show");
       eraserPopup?.classList.remove("show");
     } else {
       setActiveTool("brush");
-      showOnlyPopup("brush");
+      brushPopup?.classList.add("show");
+      eraserPopup?.classList.remove("show");
     }
     return;
   }
@@ -562,27 +718,38 @@ document.addEventListener("click", (e) => {
       brushPopup?.classList.remove("show");
     } else {
       setActiveTool("eraser");
-      showOnlyPopup("eraser");
+      eraserPopup?.classList.add("show");
+      brushPopup?.classList.remove("show");
     }
     return;
   }
 
   if (tool === "bucket") {
     setActiveTool("bucket");
-    bucketColorPicker?.click();
+    bucketColorPicker?.click?.();
     return;
   }
 
+  // default tools (textbox, dropper, etc.)
   setActiveTool(tool);
 });
 
+
 colorPicker?.addEventListener("input", () => {
-  setToolColor(state.tool, colorPicker.value);
+  if (state.tool === "textbox") {
+    state.text.color = colorPicker.value;
+    document.querySelectorAll(`[data-tool="textbox"]`).forEach(btn => {
+      btn.style.backgroundColor = colorPicker.value;
+    });
+  } else if (state.tool === "brush" || state.tool === "bucket") {
+    setToolColor(state.tool, colorPicker.value);
+  }
 });
 
 bucketColorPicker?.addEventListener("input", () => {
   setToolColor("bucket", bucketColorPicker.value);
 });
+
 
 sizeSlider?.addEventListener("input", (e) => {
   state.brushSize = Math.max(1, parseInt(e.target.value, 10) || 1);
@@ -595,46 +762,170 @@ eraserSizeSlider?.addEventListener("input", (e) => {
   if (eraserSizeValue) eraserSizeValue.textContent = state.eraserSize;
 });
 
+const fillCheckbox = document.getElementById("shape-fill-enabled");
+if (fillCheckbox) {
+  fillCheckbox.checked = !!state.shape.fillEnabled;
+  fillCheckbox.addEventListener("change", () => {
+    state.shape.fillEnabled = fillCheckbox.checked;
+    updateShapeUI();
+  });
+}
+
+// TEXT CONTROLS
+const textFontSel = document.getElementById("text-font");
+const textSizeSlider = document.getElementById("text-size");
+const textSizeVal = document.getElementById("text-size-value");
+const textThickSlider = document.getElementById("text-thickness");
+const textThickVal = document.getElementById("text-thickness-value");
+const textAlignSel = document.getElementById("text-align");
+
+if (textFontSel) {
+  textFontSel.value = state.text.font;
+  textFontSel.addEventListener("change", () => {
+    state.text.font = textFontSel.value;
+  });
+}
+if (textSizeSlider && textSizeVal) {
+  textSizeSlider.value = state.text.size;
+  textSizeVal.textContent = state.text.size;
+  textSizeSlider.addEventListener("input", () => {
+    state.text.size = parseFloat(textSizeSlider.value) || 1.0;
+    textSizeVal.textContent = state.text.size.toFixed(1);
+  });
+}
+if (textThickSlider && textThickVal) {
+  textThickSlider.value = state.text.thickness;
+  textThickVal.textContent = state.text.thickness;
+  textThickSlider.addEventListener("input", () => {
+    state.text.thickness = Math.max(1, parseInt(textThickSlider.value, 10) || 1);
+    textThickVal.textContent = state.text.thickness;
+  });
+}
+if (textAlignSel) {
+  textAlignSel.value = state.text.align;
+  textAlignSel.addEventListener("change", () => {
+    state.text.align = textAlignSel.value;
+  });
+}
+
+
+// Canvas Events
+canvas.addEventListener("pointerdown", async (e) => {
+  e.preventDefault();
+
+  if (state.tool === "bucket") {
+    const [x, y] = getCanvasXY(e);
+    await sendBucketFill(x, y);
+    return;
+  }
+
+  if (state.tool === "textbox") {
+      const [x, y] = getCanvasXY(e);
+      const text = prompt("Enter text:");
+      if (text && text.trim().length) {
+          await sendText({
+              text,
+              origin: [x, y],
+              color: state.text.color,
+              size: state.text.size,
+              thickness: state.text.thickness,
+              font: state.text.font,
+              align: state.text.align
+          });
+      }
+      return;
+  }
+
+  if (state.tool === "shapes") {
+      const [x, y] = getCanvasXY(e);
+      if (state.shape.mode === "polygon") {
+          state.shape.points.push({ x, y });
+          drawPreviewPolygon(state.shape.points)
+      } else {
+          state.shape.start = { x, y };
+          state.drawing = true;
+          canvas.setPointerCapture(e.pointerId);
+      }
+      return;
+  }
+
+  if (state.tool === "brush" || state.tool === "eraser") {
+    canvas.setPointerCapture(e.pointerId);
+    state.drawing = true;
+    state.points = [getCanvasXY(e)];
+  }
+});
+
 brushTypeSelect?.addEventListener("change", (e) => {
   state.brushType = e.target.value;
   state.currentStamp = null;
 });
 
 
-canvas.addEventListener(
-  "pointerdown",
-  async (e) => {
-    e.preventDefault();
-
-    if (state.tool === "bucket") {
-      const [x, y] = getCanvasXY(e);
-      await sendBucketFill(x, y);
-      return;
-    }
-    if (state.tool === "dropper") {
-      const [x, y] = getCanvasXY(e);
-      await sendPickColor(x, y);
-      return;
-    }
-
-    if (state.tool === "brush" || state.tool === "eraser") {
-      canvas.setPointerCapture(e.pointerId);
-      state.drawing = true;
-      state.points = [getCanvasXY(e)];
-    }
-  },
-  { passive: false }
-);
-
 canvas.addEventListener("pointermove", (e) => {
+  if (state.tool === "shapes" && state.drawing && state.shape.start) {
+    const [x, y] = getCanvasXY(e);
+    const a = state.shape.start, b = { x, y };
+    if (state.shape.mode === "rect")    drawPreviewRect(a, b);
+    if (state.shape.mode === "ellipse") drawPreviewEllipse(a, b);
+    if (state.shape.mode === "line")    drawPreviewLine(a, b);
+    return;
+  }
+
   if (!state.drawing) return;
+
   const p = getCanvasXY(e);
   const last = state.points[state.points.length - 1];
   drawSegment(last, p);
   state.points.push(p);
 });
 
+
 canvas.addEventListener("pointerup", async (e) => {
+  if (state.tool === "shapes") {
+    if (state.shape.mode === "polygon") {
+      // Double-click to commit polygon
+      if (e.detail === 2 && state.shape.points.length >= 3) {
+        await sendShape({
+          shape: "polygon",
+          points: state.shape.points.map(p => [p.x, p.y]),
+          fill: state.shape.fillEnabled ? state.colors.bucket : null,
+          stroke: state.colors.brush,
+          strokeWidth: state.size,
+          fillAlpha: 255,
+          strokeAlpha: 255
+        });
+        state.shape.points = [];
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+      return;
+    }
+
+    // rect / ellipse / line
+    if (state.drawing && state.shape.start) {
+      const [x, y] = getCanvasXY(e);
+      const start = [state.shape.start.x, state.shape.start.y];
+      const end   = [x, y];
+
+      await sendShape({
+        shape: state.shape.mode,
+        start,
+        end,
+        fill: state.shape.fillEnabled ? state.colors.bucket : null,
+        stroke: state.colors.brush,
+        strokeWidth: state.size,
+        fillAlpha: 255,
+        strokeAlpha: 255
+      });
+
+      state.drawing = false;
+      state.shape.start = null;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    }
+    return;
+  }
+
   if (!state.drawing) return;
   state.drawing = false;
   state.points.push(getCanvasXY(e));
@@ -649,5 +940,5 @@ canvas.addEventListener("pointercancel", () => {
 
 canvas.addEventListener("dragstart", (e) => e.preventDefault());
 
-
 setActiveTool("brush");
+updateShapeUI();
