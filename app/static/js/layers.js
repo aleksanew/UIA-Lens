@@ -8,7 +8,7 @@ async function toggleVisibility(btn, i) {
         btn.textContent = "👁️"
         layer.style.visibility = "visible"
     }
-
+    updateCanvasBackground();
     const data = { index: i };
     await fetch("/api/v1/layers/update_visibility", {
         method: "POST",
@@ -17,6 +17,20 @@ async function toggleVisibility(btn, i) {
         },
         body: JSON.stringify(data)
     })
+}
+
+function updateCanvasBackground() {
+    const backgroundLayer = document.getElementById("layer0");
+    const imageStack = document.querySelector(".image-stack");
+    
+    if (backgroundLayer && imageStack) {
+        // if background is visible, use white background. Else transparent
+        if (backgroundLayer.style.visibility === "visible") {
+            imageStack.style.backgroundColor = "white";
+        } else {
+            imageStack.style.backgroundColor = "transparent";
+        }
+    }
 }
 
 async function setActive(div, i) {
@@ -60,9 +74,10 @@ async function duplicateLayer(){
     location.reload();
 }
 async function renameLayer(){
-    // Get the first element with the class "my-class"
-    const div = document.querySelector(".active");
-    let btn = div.children[0]
+    // Get "all" elements with class .layers-list AND .active (should only be one)
+    const activeDiv = document.querySelector(".layers-list .active");
+    const btn = activeDiv.querySelector("button");
+
     // Make not ugly
     const oldName = btn.textContent;
     let newName = prompt("New name");
