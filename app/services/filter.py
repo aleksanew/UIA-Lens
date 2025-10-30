@@ -89,25 +89,25 @@ def threshold(img, thresh_type:str, thresh:int):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     if thresh_type == "binary":
         ret, thresh_img = cv2.threshold(gray, thresh, 255, cv2.THRESH_BINARY)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "binary_inv":
         ret, thresh_img = cv2.threshold(gray, thresh, 255, cv2.THRESH_BINARY_INV)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "trunc":
         ret, thresh_img = cv2.threshold(gray, thresh, 255, cv2.THRESH_TRUNC)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "tozero":
         ret, thresh_img = cv2.threshold(gray, thresh, 255, cv2.THRESH_TOZERO)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "tozero_inv":
         ret, thresh_img = cv2.threshold(gray, thresh, 255, cv2.THRESH_TOZERO_INV)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "otsu":
         # Ignores passed thresh
         ret, thresh_img = cv2.threshold(gray, 0, 255, cv2.THRESH_OTSU)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     if thresh_type == "triangle":
         # Ignores passed thresh
         ret, thresh_img = cv2.threshold(gray, 0, 255, cv2.THRESH_TRIANGLE)
-        return thresh_img
+        return cv2.cvtColor(thresh_img, cv2.COLOR_GRAY2BGRA)
     return img
