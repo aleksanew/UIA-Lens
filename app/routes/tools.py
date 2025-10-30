@@ -1,6 +1,6 @@
-from flask import Blueprint, jsonify, request, session, current_app
+from flask import Blueprint, jsonify, request, session
 from app.models.LayerStack import LayerStack
-from app.services.tools import tool_brush, tool_eraser, tool_bucket
+from app.services.tools import tool_brush, tool_eraser, tool_bucket, bgr_to_hex, _ensure_bgra
 import os
 import cv2
 import numpy as np
@@ -8,11 +8,8 @@ import numpy as np
 bp = Blueprint("tools", __name__)
 
 # Load LayerStack, validate selected layer
-def _root() -> str:
-    return current_app.config.get("STORAGE_ROOT")
-
 def _get_layer_stack(pid):
-    pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    pickle_path = os.path.join("users", pid, "layers.pickle")
     if not os.path.exists(pickle_path):
         return None, jsonify({"error": f"Layer stack not found: {pickle_path}"}), 404
     
@@ -27,7 +24,7 @@ def _get_layer_stack(pid):
 
 # Ensure layer PNG exists, create if missing
 def _ensure_layer_png(pid, stack, idx):
-    layers_dir = os.path.join(_root(), pid, "layers")
+    layers_dir = os.path.join("users", pid, "layers")
     os.makedirs(layers_dir, exist_ok=True)
     layer_path = os.path.join(layers_dir, f"Layer{idx}.png")
     
@@ -42,6 +39,7 @@ def _ensure_layer_png(pid, stack, idx):
         elif arr.shape[2] == 3:
             bgra = np.zeros((arr.shape[0], arr.shape[1], 4), dtype=np.uint8)
             bgra[:, :, :3] = arr
+            #bgra[:, :, 3] = 255
             arr = bgra
         cv2.imwrite(layer_path, arr)
     
@@ -76,6 +74,7 @@ def stroke():
     tool = data.get("tool", "brush")
     color = data.get("color", "#000000")
     points = data.get("points") or []
+    brush_type = data.get("brush_type", "hard")
     
     try:
         size = int(data.get("size", 5))
@@ -97,15 +96,49 @@ def stroke():
     # Execute tool
     try:
         if tool == "eraser":
-            tool_eraser(layer_path, size, points)
+            layer = stack.get_current_layer()
+            is_background = (layer._name.lower() == "background")
+            tool_eraser(layer_path, size, points, is_background=is_background)
         else:
-            tool_brush(layer_path, color, size, points)
+            tool_brush(layer_path, color, size, points, brush_type=brush_type)
     except Exception as e:
         return jsonify({"error": f"Tool '{tool}' failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    pickle_path = os.path.join("users", pid, "layers.pickle")
     return _update_and_save(stack, layer_path, pickle_path)
+
+
+@bp.post("/dropper")
+def dropper():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "Not logged in / missing pid"}), 401
+
+    data = request.get_json() or {}
+    try:
+        x, y = map(int, (data["x"], data["y"]))
+    except Exception:
+        return jsonify({"error": "x and y must be integers"}), 400
+
+    # Last valgt lag
+    stack, err, code = _get_layer_stack(pid)
+    if stack is None:
+        return err, code
+
+    layer_path = _ensure_layer_png(pid, stack, stack._selected_layer)
+
+    # Les bilde og sørg for BGRA-format
+    img = _ensure_bgra(cv2.imread(layer_path, cv2.IMREAD_UNCHANGED))
+    if img is None:
+        return jsonify({"error": f"Could not open {layer_path}"}), 500
+
+    h, w = img.shape[:2]
+    if not (0 <= x < w and 0 <= y < h):
+        return jsonify({"error": f"point out of bounds ({x},{y}) for size {w}x{h}"}), 400
+
+    b, g, r, a = map(int, img[y, x])
+    return jsonify({"hex": bgr_to_hex(b, g, r), "rgba": [r, g, b, a]}), 200
 
 
 @bp.post("/bucket_fill")
@@ -148,5 +181,5 @@ def bucket_fill():
         return jsonify({"error": f"Bucket failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    pickle_path = os.path.join("users", pid, "layers.pickle")
     return _update_and_save(stack, layer_path, pickle_path)
