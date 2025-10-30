@@ -182,6 +182,11 @@ class LayerStack:
         for i, x in enumerate(self._layer_array):
             cv2.imwrite(f"{folder}/Layer{i}.png", x.get_image())
 
+    def create_image_from_selected_layers_at(self, folder):
+        i = self._selected_layer
+        selected_image = self._layer_array[i].get_image()
+        cv2.imwrite(f"{folder}/Layer{i}.png", selected_image)
+
     # Get object in form of json.
     # Will only return filename, and not images,
     # images must be stored first with "create_images_from_layers_at".

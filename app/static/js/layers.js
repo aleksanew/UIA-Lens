@@ -74,9 +74,10 @@ async function duplicateLayer(){
     location.reload();
 }
 async function renameLayer(){
-    // Get the first element with the class "my-class"
-    const div = document.querySelector(".active");
-    let btn = div.children[0]
+    // Get "all" elements with class .layers-list AND .active (should only be one)
+    const activeDiv = document.querySelector(".layers-list .active");
+    const btn = activeDiv.querySelector("button");
+
     // Make not ugly
     const oldName = btn.textContent;
     let newName = prompt("New name");
