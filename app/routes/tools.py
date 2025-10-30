@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request, session, current_app
 from app.models.LayerStack import LayerStack
-from app.services.tools import tool_brush, tool_eraser, tool_bucket
+from app.services.tools import tool_brush, tool_eraser, tool_bucket, tool_text, tool_shape
 import os
 import cv2
 import numpy as np
+
 
 bp = Blueprint("tools", __name__)
 
@@ -148,5 +149,112 @@ def bucket_fill():
         return jsonify({"error": f"Bucket failed: {e}"}), 500
 
     # Update and save
+    pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    return _update_and_save(stack, layer_path, pickle_path)
+
+@bp.post("/shape")
+def shape():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "Not logged in / missing pid"}), 401
+
+    data = request.get_json() or {}
+    shape = data.get("shape")
+    start = data.get("start")
+    end = data.get("end")
+    points = data.get("points")
+    fill = data.get("fill")
+    stroke = data.get("stroke", "#000000")
+
+    try:
+        stroke_width = int(data.get("strokeWidth", 2))
+        fill_alpha = int(data.get("fillAlpha", 255))
+        stroke_alpha = int(data.get("strokeAlpha", 255))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid numeric value for stroke/fill alpha/width"}), 400
+
+    if shape in ("rect", "ellipse", "line"):
+        if not (isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)) and len(start) == 2 and len(end) == 2):
+            return jsonify({"error": "start and end must be [x, y]"}), 400
+    elif shape == "polugon":
+        if not (isinstance(points, list) and len(points) >= 3 and all(len)(p) == 2 for p in points):
+            return jsonify({"error": "points must be [x, y]"}), 400
+    else:
+        return jsonify({"error": "Invalid shape"}), 400
+
+    stack, error_response, status_code = _get_layer_stack(pid)
+    if stack is None:
+        return error_response, status_code
+
+    idx = stack._selected_layer
+    layer_path = _ensure_layer_png(pid, stack, idx)
+
+    try:
+        tool_shape(
+            image_path=layer_path,
+            shape=shape,
+            start=start,
+            end=end,
+            points=points,
+            fill=fill,
+            stroke=stroke,
+            stroke_width=stroke_width,
+            fill_alpha=fill_alpha,
+            stroke_alpha=stroke_alpha,
+        )
+    except Exception as e:
+        return jsonify({"error": f"Tool '{shape}' failed: {e}"}), 500
+
+    pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    return _update_and_save(stack, layer_path, pickle_path)
+
+@bp.post("/text")
+def text():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "Not logged in / missing pid"}), 401
+
+    data = request.get_json() or {}
+    text = data.get("text")
+    origin = data.get("origin")
+
+    if not text or not (isinstance(origin, (list, tuple)) and len(origin) == 2):
+        return jsonify({"error": "origin must be [x, y]"}), 400
+
+    color = data.get("color", "#000000")
+    font = data.get("font", "sans")
+    align = data.get("align", "left")
+
+    try:
+        size = float(data.get("size", 1.0))
+        thickness = int(data.get("thickness", 2))
+        outline = data.get("outline")
+        outline_thickness = int(data.get("outlineThickness", 0))
+    except (TypeError, ValueError):
+        return jsonify({"error": "Invalid numeric value for outline/thickness"}), 400
+
+    stack, error_response, status_code = _get_layer_stack(pid)
+    if stack is None:
+        return error_response, status_code
+
+    idx = stack._selected_layer
+    layer_path = _ensure_layer_png(pid, stack, idx)
+
+    try:
+        tool_text(
+            image_path=layer_path,
+            text=text,
+            origin=origin,
+            color=color,
+            size=size,
+            thickness=thickness,
+            font=font,
+            align=align,
+            outline=outline,
+            outline_thickness=outline_thickness,
+        )
+    except Exception as e:
+        return jsonify({"error": f"Tool '{text}' failed: {e}"}), 500
+
     pickle_path = os.path.join(_root(), pid, "layers.pickle")
     return _update_and_save(stack, layer_path, pickle_path)
