@@ -35,15 +35,17 @@ def save_project(root: str, meta: dict) -> None:
     p = Path(root) / meta["id"] / "project.json"
     p.write_text(json.dumps(meta))
 
-def load_layers() -> LayerStack.LayerStack:
+def load_layers() -> LayerStack.LayerStack or None:
     pid = session["pid"]
     stack = LayerStack.LayerStack(0, 0)
-    stack.load_pickle(f"{_root()}/{pid}/layers.pickle")
-    return stack
+    if stack.load_pickle(f"{_root()}/{pid}/layers.pickle"):
+        return stack
+    else:
+        return None
 
-def save_layers(stack: LayerStack.LayerStack) -> None:
+def save_layers(stack: LayerStack.LayerStack) -> bool:
     pid = session["pid"]
-    stack.save_pickle(f"{_root()}/{pid}/layers.pickle")
+    return stack.save_pickle(f"{_root()}/{pid}/layers.pickle")
 
 def user_path() -> str:
     pid = session["pid"]
