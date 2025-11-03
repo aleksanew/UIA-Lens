@@ -1,18 +1,30 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
   <title>UIA Lens — Editor</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/editor.css') }}" />
+
+  <!-- Styles -->
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/main.css') }}"
+  />
+  <link
+    rel="stylesheet"
+    href="{{ url_for('static', filename='css/editor.css') }}"
+  />
 </head>
 
 <body class="page-editor">
+  <!-- Top Menubar -->
   <header class="menubar">
     <div class="brand">UIA Lens</div>
-    <nav class="menus">
+
+    <nav class="menus" aria-label="Main menu">
       <details>
         <summary>File</summary>
         <ul>
@@ -80,24 +92,26 @@
         </ul>
       </details>
     </nav>
-
   </header>
 
-
+  <!-- Left Toolbar -->
   <aside class="toolbar" aria-label="Tools">
+    <!-- Selection -->
     <button data-tool="rectangular" title="Select (Rectangular)">▭</button>
     <button data-tool="freeform_select" title="Freeform Select">✏️</button>
     <button data-tool="polygoanl_select" title="Polygonal Select">🔺</button>
     <button data-tool="magic_lasso" title="Magic Lasso">🪄</button>
     <hr />
 
+    <!-- Brush -->
     <div class="tool-container">
       <button data-tool="brush" title="Brush">🖌️</button>
       <div class="brush-popup" id="brush-popup">
         <div class="brush-popup-item">
-          <label>Color</label>
+          <label for="color-picker">Color</label>
           <input type="color" id="color-picker" value="#ff0000" />
         </div>
+
         <div class="brush-popup-item">
           <div class="size-display">
             <span>Size</span>
@@ -105,8 +119,9 @@
           </div>
           <input type="range" id="size-slider" min="1" max="100" value="10" />
         </div>
+
         <div class="brush-popup-item">
-          <label>Type</label>
+          <label for="brush-type-select">Type</label>
           <select id="brush-type-select">
             <option value="hard">Hard</option>
             <option value="chalk">Chalk</option>
@@ -117,6 +132,7 @@
       </div>
     </div>
 
+    <!-- Eraser -->
     <div class="tool-container">
       <button data-tool="eraser" title="Eraser">🩹</button>
       <div class="eraser-popup" id="eraser-popup">
@@ -125,29 +141,214 @@
             <span>Size</span>
             <span class="size-value" id="eraser-size-value">10</span>
           </div>
-          <input type="range" id="eraser-size-slider" min="1" max="100" value="10" />
+          <input
+            type="range"
+            id="eraser-size-slider"
+            min="1"
+            max="100"
+            value="10"
+          />
         </div>
       </div>
     </div>
 
+    <!-- Bucket & Dropper -->
     <button data-tool="bucket" title="Bucket">🪣</button>
-    <input type="color" id="bucket-color-picker" value="#00ff00" style="display:none;" />
+    <input
+      type="color"
+      id="bucket-color-picker"
+      value="#00ff00"
+      style="display:none;"
+    />
     <button data-tool="dropper" title="Dropper">🎯</button>
+
     <hr />
+
+    <!-- Filters -->
+    <div class="filter-container">
+      <button data-tool="filters" title="Filters" id="filterButton">✨</button>
+
+      <div class="filter-option-container">
+        <label for="filterSelected">Select filter:</label>
+        <select
+          class="filter-select"
+          id="filterSelected"
+          onchange="changeOptions()"
+        >
+          <option value="" selected>-- Choose Filter Type --</option>
+          <option value="hueOption">Hue Shift</option>
+          <option value="grayOption">Grayscale</option>
+          <option value="featureOption">Harris corner Detection</option>
+          <option value="edgeOption">Edge Detection</option>
+          <option value="treshOption">Thresholding</option>
+          <option value="blurOption">Gaussian blurring</option>
+          <option value="medianOption">Median blurring</option>
+          <option value="bilateralOption">Bilateral filtering</option>
+          <option value="customOption">Custom kernel blur</option>
+        </select>
+
+        <!-- Hue -->
+        <div class="filter-option" id="hueOption" style="display:none">
+          <hr />
+          <form onsubmit="hueShift(event)">
+            <label for="inpHue">Amount of shift:</label>
+            <input type="number" id="inpHue" value="50" required />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Grayscale -->
+        <div class="filter-option" id="grayOption" style="display:none">
+          <hr />
+          <p>(Sets alpha channels to 1)</p>
+          <form onsubmit="grayscale(event)">
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Harris -->
+        <div class="filter-option" id="featureOption" style="display:none">
+          <hr />
+          <p>(Sets alpha channels to 1)</p>
+          <form onsubmit="featureDetection(event)">
+            <label for="inpBlockSize">Block size:</label>
+            <input type="number" id="inpBlockSize" value="2" required min="1" />
+            <label for="inpKSize">K size:</label>
+            <input type="number" id="inpKSize" value="3" required max="31" step="2" />
+            <label for="inpK" id="sliderValue">K: 0.04</label>
+            <input type="range" id="inpK" min="0.01" max="0.1" step="0.005" value="0.04" />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Edge -->
+        <div class="filter-option" id="edgeOption" style="display:none">
+          <hr />
+          <p>(Sets alpha channels to 1)</p>
+          <form onsubmit="edgeDetection(event)">
+            <label for="edgeAlg">Algorithm:</label>
+            <select class="filter-select" id="edgeAlg">
+              <option value="sobel">Sobel</option>
+              <option value="laplace">Laplace</option>
+              <option value="canny">Canny</option>
+            </select>
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Threshold -->
+        <div class="filter-option" id="treshOption" style="display:none">
+          <hr />
+          <p>(Sets alpha channels to 1)</p>
+          <form onsubmit="thresholding(event)">
+            <label for="threshAlg">Algorithm:</label>
+            <select class="filter-select" id="threshAlg" onchange="disableThresh()">
+              <option value="binary">Binary</option>
+              <option value="binary_inv">Inverse binary</option>
+              <option value="trunc">Truncate</option>
+              <option value="tozero">To zero</option>
+              <option value="tozero_inv">Inverse to zero</option>
+              <option value="otsu">otsu</option>
+              <option value="triangle">Triangle</option>
+            </select>
+            <label for="inpThresh">Threshold:</label>
+            <input type="number" id="inpThresh" value="127" required />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Gaussian -->
+        <div class="filter-option" id="blurOption" style="display:none">
+          <hr />
+          <form onsubmit="gaussBlur(event)">
+            <label for="inpKSize1">Ksize:</label>
+            <div style="display:flex;gap:.5rem;flex-wrap:nowrap">
+              <input type="number" id="inpKSize1" value="5" required min="1" step="2" style="width:50%" />
+              <input type="number" id="inpKSize2" value="5" required min="1" step="2" style="width:50%" />
+            </div>
+            <label for="inpSigmaX">Sigma X:</label>
+            <input type="number" id="inpSigmaX" value="0" required />
+            <label for="inpSigmaY">Sigma Y:</label>
+            <input type="number" id="inpSigmaY" value="0" required />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Median -->
+        <div class="filter-option" id="medianOption" style="display:none">
+          <hr />
+          <form onsubmit="medianBlur(event)">
+            <label for="inpMedianKSize">Ksize:</label>
+            <input type="number" id="inpMedianKSize" value="5" required min="1" step="2" />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Bilateral -->
+        <div class="filter-option" id="bilateralOption" style="display:none">
+          <hr />
+          <p>(Sets alpha channels to 1)</p>
+          <form onsubmit="bilateralBlur(event)">
+            <label for="inpD">d:</label>
+            <input type="number" id="inpD" value="9" required max="10" />
+            <label for="inpSigmaColor">Sigma color:</label>
+            <input type="number" id="inpSigmaColor" value="75" required />
+            <label for="inpSigmaSpace">Sigma space:</label>
+            <input type="number" id="inpSigmaSpace" value="75" required />
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+
+        <!-- Custom Kernel -->
+        <div class="filter-option" id="customOption" style="display:none">
+          <hr />
+          <label for="nMatrix">Kernel shape:</label>
+          <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap">
+            <input type="number" id="nMatrix" value="5" required onchange="createMatrix()" />
+            <span>⨯</span>
+            <input type="number" id="mMatrix" value="5" required onchange="createMatrix()" />
+          </div>
+          <hr />
+          <form class="no-arrow" onsubmit="customKernel(event)">
+            <label for="matrixConst">Kernel = Const ⨯ Matrix</label>
+            <div style="display:flex;justify-content:center;align-items:center;gap:.25rem;margin:.5rem 0;">
+              <span>( 1 ÷</span>
+              <input type="number" id="matrixConst" value="25" style="width:3.5rem" />
+              <span>) ⨯</span>
+            </div>
+            <div class="matrix" id="matrix"></div>
+            <input type="submit" value="Apply" />
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Textbox & Shapes -->
     <button data-tool="textbox" title="Textbox">🔤</button>
-    <button data-tool="shapes" title="Shapes">⬛</button>
+    <button data-tool="shapes" title="Shapes" aria-label="Shapes">⬛</button>
   </aside>
 
-
+  <!-- Main Canvas Area -->
   <main class="canvas-area" aria-label="Canvas area">
     <div class="canvas-stack">
-      <div class="image-stack" style="width: {{ data.width }}px; height: {{ data.height }}px;">
+      <div
+        class="image-stack"
+        style="width: {{ data.width }}px; height: {{ data.height }}px;"
+      >
         {% for layer in data.layers %}
-        <img src="{{ url_for('ui.layer_img', filename=layer.filename) }}" alt="{{ layer.name }}" class="stacked-img"
-          id="layer{{loop.index0}}" {% if layer.visible==1 %} style="visibility: visible;" {% else %}
-          style="visibility: hidden;" {% endif %}>
+          <img
+            src="{{ url_for('ui.layer_img', filename=layer.filename) }}"
+            alt="{{ layer.name }}"
+            class="stacked-img"
+            id="layer{{ loop.index0 }}"
+            style="visibility: {{ 'visible' if layer.visible == 1 else 'hidden' }};"
+          />
         {% endfor %}
-        <canvas id="paint-overlay" width="{{ data.width }}" height="{{ data.height }}"></canvas>
+        <canvas
+          id="paint-overlay"
+          width="{{ data.width }}"
+          height="{{ data.height }}"
+        ></canvas>
       </div>
 
       <div class="zoom-overlay">
@@ -161,10 +362,12 @@
     </div>
   </main>
 
+  <!-- Right Sidebar: Layers & Settings -->
   <aside class="layers-panel" aria-label="Layers">
     <header class="layers-header">
       <h2>Layers</h2>
     </header>
+
     <div class="layer-actions">
       <button title="Add layer" onclick="addLayer()">＋</button>
       <button title="Delete layer" onclick="deleteLayer()">🗑️</button>
@@ -179,11 +382,7 @@
           {{ layer.name }}
         </button>
         <button class="layer-hide" onclick="toggleVisibility(this, {{ loop.index0 }})">
-          {% if layer.visible == 1 %}
-          👁️
-          {% else %}
-          🚫
-          {% endif %}
+          {% if layer.visible == 1 %} 👁️ {% else %} 🚫 {% endif %}
         </button>
       </div>
       {% endfor %}
@@ -194,11 +393,67 @@
       <button title="Redo">↷</button>
     </div>
 
+    <hr />
+
+    <!-- Shapes setting -->
+    <div class="tool-settings">
+      <label style="display:flex;gap:.5rem;align-items:center;">
+        <input type="checkbox" id="shape-fill-enabled" checked />
+        Enable Fill (Shapes)
+      </label>
+    </div>
+
+    <hr />
+
+    <!-- Text settings -->
+    <div class="tool-settings" id="text-settings">
+      <p>Text:</p>
+
+      <label for="text-font">Font:</label>
+      <select id="text-font">
+        <option value="sans" selected>Sans</option>
+        <option value="sans-bold">Sans Bold</option>
+        <option value="mono">Mono</option>
+        <option value="script">Script</option>
+      </select>
+
+      <br />
+
+      <label for="text-size">Size:</label>
+      <input type="range" id="text-size" min="0.5" max="4.0" step="0.1" value="1.2" />
+      <span id="text-size-value">1.2</span>
+
+      <br />
+
+      <label for="text-thickness">Thickness:</label>
+      <input type="range" id="text-thickness" min="1" max="10" step="1" value="2" />
+      <span id="text-thickness-value">2</span>
+
+      <br />
+
+      <label for="text-align">Align:</label>
+      <select id="text-align">
+        <option value="left" selected>Left</option>
+        <option value="center">Center</option>
+        <option value="right">Right</option>
+      </select>
+    </div>
+
+    <!-- Projects list -->
+    <section class="storage-projects" aria-label="Projects in storage">
+      <header class="projects-header">
+        <h3>Projects</h3>
+        <button id="projects-refresh" title="Refresh list">↻</button>
+      </header>
+      <div id="projects-list" class="projects-list" aria-live="polite"></div>
+    </section>
   </aside>
 
+  <!-- Scripts -->
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/paint.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/filters.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='js/fileops.js') }}" defer></script>
 </body>
-<script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
-<script src="{{ url_for('static', filename='js/layers.js') }}" defer></script>
-<script src="{{ url_for('static', filename='js/paint.js') }}" defer></script>
-
 </html>

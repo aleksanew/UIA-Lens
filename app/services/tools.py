@@ -253,3 +253,126 @@ def tool_bucket(image_path: str, color: str, start_point: list[int], tolerance: 
     img[filled, 3] = 255
 
     cv2.imwrite(image_path, img)
+
+def _hex_to_bgra(hex_color: str, alpha: int) -> tuple[int, int, int, int]:
+    b, g, r = hex_to_bgr(hex_color)
+    return (b, g, r, int(np.clip(alpha, 0, 255)))
+
+def tool_shape(
+        image_path: str,
+        shape: str,
+        start: list[int] | None = None,
+        end: list[int] | None = None,
+        points: list[list[int]] | None = None,
+        fill: str | None = None,
+        stroke: str | None = "#000000",
+        stroke_width: int = 2,
+        fill_alpha: int = 255,
+        stroke_alpha: int = 255
+):
+    img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise FileNotFoundError(f"Could not open picture: {image_path}")
+    img = _ensure_bgra(img)
+
+    H, W = img.shape[:2]
+    def clamp_xy(x, y): return(int(np.clip(x, 0, W-1)), int(np.clip(y, 0, H-1)))
+
+    overlay = img.copy()
+
+    if shape in ("rect", "ellipse", "line"):
+        x0, y0 = clamp_xy(*start)
+        x1, y1 = clamp_xy(*end)
+    if shape == "polygon":
+        pts = np.array([clamp_xy(x, y) for x, y in (points or [])], dtype=np.int32)
+
+    if fill:
+        fill_c = _hex_to_bgra(fill, fill_alpha)
+        if shape == "rect":
+            cv2.rectangle(overlay, (x0, y0), (x1, y1), fill_c, thickness=cv2.FILLED, lineType=cv2.LINE_AA)
+        elif shape == "ellipse":
+            center = ( (x0+x1)//2, (y0+y1)//2 )
+            axes = ( abs(x1-x0)//2, abs(y1-y0)//2 )
+            cv2.ellipse(overlay, center, axes, 0, 0, 360, fill_c, thickness=cv2.FILLED, lineType=cv2.LINE_AA)
+        elif shape == "polygon" and len(pts) >= 3:
+            cv2.fillPoly(overlay, [pts], fill_c, lineType=cv2.LINE_AA)
+
+    if stroke and stroke_width > 0:
+        stroke_c = _hex_to_bgra(stroke, stroke_alpha)
+        if shape == "rect":
+            cv2.rectangle(overlay, (x0, y0), (x1, y1), stroke_c, thickness=int(stroke_width), lineType=cv2.LINE_AA)
+        elif shape == "ellipse":
+            center = ( (x0+x1)//2, (y0+y1)//2 )
+            axes = ( abs(x1-x0)//2, abs(y1-y0)//2 )
+            cv2.ellipse(overlay, center, axes, 0, 0, 360, stroke_c, thickness=int(stroke_width), lineType=cv2.LINE_AA)
+        elif shape == "line":
+            cv2.line(overlay, (x0, y0), (x1, y1), stroke_c, thickness=int(stroke_width), lineType=cv2.LINE_AA)
+        elif shape == "polygon" and len(pts) >= 2:
+            cv2.polylines(overlay, [pts], isClosed=True, color=stroke_c, thickness=int(stroke_width), lineType=cv2.LINE_AA)
+
+    a = overlay[..., 3:4] / 255.0
+    img[..., :3] = (overlay[..., :3] * a + img[..., :3] * (1 - a)).astype(np.uint8)
+    img[..., 3]  = np.clip(overlay[..., 3] + img[..., 3]*(1 - a[...,0]), 0, 255).astype(np.uint8)
+
+    cv2.imwrite(image_path, img)
+
+_CV2_FONTS = {
+    "sans":   cv2.FONT_HERSHEY_SIMPLEX,
+    "sans-bold": cv2.FONT_HERSHEY_DUPLEX,
+    "mono":   cv2.FONT_HERSHEY_PLAIN,
+    "script": cv2.FONT_HERSHEY_SCRIPT_SIMPLEX
+}
+
+def tool_text(
+    image_path: str,
+    text: str,
+    origin: list[int],
+    color: str = "#000000",
+    size: float = 1.0,
+    thickness: int = 2,
+    font: str = "sans",
+    align: str = "left",
+    outline: str | None = None,
+    outline_thickness: int = 2,
+):
+    img = cv2.imread(image_path, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        raise FileNotFoundError(f"Could not open picture: {image_path}")
+    img = _ensure_bgra(img)
+
+    size = max(0.1, float(size))
+    thickness = max(1, int(thickness))
+    outline_thickness = max(0, int(outline_thickness))
+
+    h, w = img.shape[:2]
+    x, y = map(int, origin)
+    x = max(0, min(w - 1, x))
+    y = max(0, min(h - 1, y))
+
+    fontFace = _CV2_FONTS.get(font, cv2.FONT_HERSHEY_SIMPLEX)
+
+    try:
+        txt = (text or "")
+        txt = txt.encode("ascii", "ignore").decode("ascii")
+    except Exception:
+        txt = ""
+
+    (tw, th), base = cv2.getTextSize(txt, fontFace, size, max(1, thickness))
+
+    if align == "center":
+        x -= tw // 2
+    elif align == "right":
+        x -= tw
+
+    if outline and outline_thickness > 0:
+        oc = (*hex_to_bgr(outline), 255)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                if dx == 0 and dy == 0:
+                    continue
+                cv2.putText(img, txt, (x + dx, y + dy), fontFace, size, oc, outline_thickness, cv2.LINE_AA)
+
+    c = (*hex_to_bgr(color), 255)
+    cv2.putText(img, txt, (x, y), fontFace, size, c, thickness, cv2.LINE_AA)
+
+    cv2.imwrite(image_path, img)

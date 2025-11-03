@@ -6,9 +6,11 @@ import pickle
 from pathlib import Path
 from io import BytesIO
 from PIL import Image
+from flask import session, current_app
+from app.models import LayerStack
 
-from app.models.LayerStack import LayerStack
-
+def _root() -> str:
+    return current_app.config.get("STORAGE_ROOT")
 
 def _pid() -> str:
     return uuid.uuid4().hex[:8]
@@ -32,6 +34,20 @@ def open_project(root: str, pid: str) -> dict:
 def save_project(root: str, meta: dict) -> None:
     p = Path(root) / meta["id"] / "project.json"
     p.write_text(json.dumps(meta))
+
+def load_layers() -> LayerStack.LayerStack:
+    pid = session["pid"]
+    stack = LayerStack.LayerStack(0, 0)
+    stack.load_pickle(f"{_root()}/{pid}/layers.pickle")
+    return stack
+
+def save_layers(stack: LayerStack.LayerStack) -> None:
+    pid = session["pid"]
+    stack.save_pickle(f"{_root()}/{pid}/layers.pickle")
+
+def user_path() -> str:
+    pid = session["pid"]
+    return f"{_root()}/{pid}"
 
 def copy_project(root: str, old_pid: str, new_name: str) -> str:
     old_path = Path(root) / old_pid
