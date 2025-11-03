@@ -33,6 +33,12 @@ class LayerStack:
     def size(self):
         return np.size(self._layer_array)
 
+    def selected_layer(self):
+        return self._selected_layer
+
+    def shape(self):
+        return self._height, self._width
+
     # Get layer_array[i]
     def at(self, i):
         if i >= np.size(self._layer_array):

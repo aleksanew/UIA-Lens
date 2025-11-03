@@ -33,10 +33,7 @@ def index():
 # Load canvas from user storage, get json from canvas and send to frontend
 @bp.get("/editor")
 def editor():
-    pid = session["pid"]
-    stack = LayerStack.LayerStack(0, 0)
-    storage_root = current_app.config.get("STORAGE_ROOT")
-    stack.load_pickle(f"{storage_root}/{pid}/layers.pickle")
+    stack = storage.load_layers()
     data = stack.get_as_json()
     return render_template("editor.html", data=data)
 
@@ -57,7 +54,7 @@ def open_new_project():
     stack = LayerStack.LayerStack(500, 500)
     stack.add_base_layers()
     stack.create_images_from_layers_at(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers")
-    stack.save_pickle(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers.pickle")
+    storage.save_layers(stack)
     return redirect(url_for("ui.editor"))
 
 

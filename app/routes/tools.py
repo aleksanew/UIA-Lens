@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, session, current_app
 from app.models.LayerStack import LayerStack
 from app.services.tools import tool_brush, tool_eraser, tool_bucket, bgr_to_hex, _ensure_bgra, tool_text, tool_shape
+from app.services import storage
 import os
 import cv2
 import numpy as np
@@ -35,7 +36,7 @@ def _ensure_layer_png(pid, stack, idx):
         layer = stack.get_current_layer()
         arr = layer.get_image()
         if arr is None:
-            h, w = stack._height, stack._width
+            h, w = stack.shape()
             arr = np.zeros((h, w, 4), dtype=np.uint8)
         if arr.ndim == 2:
             arr = cv2.cvtColor(arr, cv2.COLOR_GRAY2BGRA)
@@ -61,7 +62,7 @@ def _update_and_save(stack, layer_path, pickle_path):
     
     stack.get_current_layer().update(img)
     
-    if not stack.save_pickle(pickle_path):
+    if not storage.save_layers(stack):
         return jsonify({"status": "ok", "warning": "PNG updated but pickle save failed"}), 200
     
     return jsonify({"status": "ok"}), 200
@@ -88,19 +89,17 @@ def stroke():
         return jsonify({"error": "Need at least two points"}), 400
 
     # Load stack
-    stack, error_response, status_code = _get_layer_stack(pid)
-    if stack is None:
-        return error_response, status_code
+    stack = storage.load_layers()
 
     # Ensure PNG exists
-    idx = stack._selected_layer
+    idx = stack.selected_layer()
     layer_path = _ensure_layer_png(pid, stack, idx)
 
     # Execute tool
     try:
         if tool == "eraser":
             layer = stack.get_current_layer()
-            is_background = (layer._name.lower() == "background")
+            is_background = (layer.get_name().lower() == "background")
             tool_eraser(layer_path, size, points, is_background=is_background)
         else:
             tool_brush(layer_path, color, size, points, brush_type=brush_type)
@@ -108,9 +107,14 @@ def stroke():
         return jsonify({"error": f"Tool '{tool}' failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join("users", pid, "layers.pickle")
-    return _update_and_save(stack, layer_path, pickle_path)
-
+    # pickle_path = os.path.join("users", pid, "layers.pickle")
+    # return _update_and_save(stack, layer_path, pickle_path)
+    if storage.save_layers(stack):
+        print("A")
+        return jsonify({"status": "ok"}), 200
+    else:
+        print("B")
+        return jsonify({"error": "failed to save layers"}), 400
 
 @bp.post("/dropper")
 def dropper():
@@ -125,11 +129,12 @@ def dropper():
         return jsonify({"error": "x and y must be integers"}), 400
 
     # Last valgt lag
-    stack, err, code = _get_layer_stack(pid)
-    if stack is None:
-        return err, code
+    # stack, err, code = _get_layer_stack(pid)
+    # if stack is None:
+    #     return err, code
+    stack = storage.load_layers()
 
-    layer_path = _ensure_layer_png(pid, stack, stack._selected_layer)
+    layer_path = _ensure_layer_png(pid, stack, stack.selected_layer())
 
     # Les bilde og sørg for BGRA-format
     img = _ensure_bgra(cv2.imread(layer_path, cv2.IMREAD_UNCHANGED))
@@ -159,12 +164,13 @@ def bucket_fill():
         return jsonify({"error": "start_point must be [x, y]"}), 400
 
     # Load stack
-    stack, error_response, status_code = _get_layer_stack(pid)
-    if stack is None:
-        return error_response, status_code
+    # stack, error_response, status_code = _get_layer_stack(pid)
+    # if stack is None:
+    #     return error_response, status_code
+    stack = storage.load_layers()
 
     # Ensure PNG exists
-    idx = stack._selected_layer
+    idx = stack.selected_layer()
     layer_path = _ensure_layer_png(pid, stack, idx)
 
     # Bounds check
@@ -184,8 +190,12 @@ def bucket_fill():
         return jsonify({"error": f"Bucket failed: {e}"}), 500
 
     # Update and save
-    pickle_path = os.path.join("users", pid, "layers.pickle")
-    return _update_and_save(stack, layer_path, pickle_path)
+    # pickle_path = os.path.join("users", pid, "layers.pickle")
+    # return _update_and_save(stack, layer_path, pickle_path)
+    if storage.save_layers(stack):
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"error": "failed to save layers"}), 400
 
 @bp.post("/shape")
 def shape():
@@ -217,11 +227,12 @@ def shape():
     else:
         return jsonify({"error": "Invalid shape"}), 400
 
-    stack, error_response, status_code = _get_layer_stack(pid)
-    if stack is None:
-        return error_response, status_code
+    # stack, error_response, status_code = _get_layer_stack(pid)
+    # if stack is None:
+    #     return error_response, status_code
+    stack = storage.load_layers()
 
-    idx = stack._selected_layer
+    idx = stack.selected_layer()
     layer_path = _ensure_layer_png(pid, stack, idx)
 
     try:
@@ -240,8 +251,12 @@ def shape():
     except Exception as e:
         return jsonify({"error": f"Tool '{shape}' failed: {e}"}), 500
 
-    pickle_path = os.path.join(_root(), pid, "layers.pickle")
-    return _update_and_save(stack, layer_path, pickle_path)
+    # pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    # return _update_and_save(stack, layer_path, pickle_path)
+    if storage.save_layers(stack):
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"error": "failed to save layers"}), 400
 
 @bp.post("/text")
 def text():
@@ -268,11 +283,12 @@ def text():
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid numeric value for outline/thickness"}), 400
 
-    stack, error_response, status_code = _get_layer_stack(pid)
-    if stack is None:
-        return error_response, status_code
+    # stack, error_response, status_code = _get_layer_stack(pid)
+    # if stack is None:
+    #     return error_response, status_code
+    stack = storage.load_layers()
 
-    idx = stack._selected_layer
+    idx = stack.selected_layer()
     layer_path = _ensure_layer_png(pid, stack, idx)
 
     try:
@@ -291,5 +307,9 @@ def text():
     except Exception as e:
         return jsonify({"error": f"Tool '{text}' failed: {e}"}), 500
 
-    pickle_path = os.path.join(_root(), pid, "layers.pickle")
-    return _update_and_save(stack, layer_path, pickle_path)
+    # pickle_path = os.path.join(_root(), pid, "layers.pickle")
+    # return _update_and_save(stack, layer_path, pickle_path)
+    if storage.save_layers(stack):
+        return jsonify({"status": "ok"}), 200
+    else:
+        return jsonify({"error": "failed to save layers"}), 400
