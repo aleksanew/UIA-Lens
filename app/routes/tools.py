@@ -116,6 +116,7 @@ def stroke():
         print("B")
         return jsonify({"error": "failed to save layers"}), 400
 
+
 @bp.post("/dropper")
 def dropper():
     pid = session.get("pid")
