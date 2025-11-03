@@ -818,6 +818,11 @@ canvas.addEventListener("pointerdown", async (e) => {
     await sendBucketFill(x, y);
     return;
   }
+  if (state.tool === "dropper") {
+    const [x, y] = getCanvasXY(e);
+    await sendPickColor(x, y);
+    return;
+  }
 
   if (state.tool === "textbox") {
       const [x, y] = getCanvasXY(e);
