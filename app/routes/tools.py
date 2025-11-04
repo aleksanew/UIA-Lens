@@ -253,3 +253,18 @@ def text():
         return jsonify({"error": f"Tool '{text}' failed: {e}"}), 500
 
     return _update_and_save(stack, layer_path)
+
+
+#TODO make buttons gray
+@bp.post("/undo")
+def undo():
+
+
+    return jsonify({"status": "ok"}), 200
+
+
+@bp.post("/redo")
+def redo():
+
+
+    return jsonify({"status": "ok"}), 200

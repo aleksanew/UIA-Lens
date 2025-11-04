@@ -29,7 +29,7 @@ def new_project():
     user_path = get_user_path(pid)
 
     # generate layer images and save serialized state
-    stack.create_images_from_layers_at(os.path.join(user_path, "layers"))
+    storage.redraw_all_images(stack)
     stack.save_pickle(os.path.join(user_path, "layers.pickle"))
 
     # ensure metadata uses schema (id, name, layers)
@@ -77,7 +77,7 @@ def open_project():
             if stack.load_pickle(canonical_pickle):
                 layers_dir = os.path.join(user_path, "layers")
                 os.makedirs(layers_dir, exist_ok=True)
-                stack.create_images_from_layers_at(layers_dir)
+                storage.redraw_all_images(stack)
                 # Ensure metadata exists (minimal schema)
                 meta_path = get_project_json_path(pid)
                 meta = {"id": pid, "name": name_no_ext or "uploaded", "layers": []}
@@ -151,7 +151,7 @@ def open_project():
 
             layers_dir = os.path.join(user_path, "layers")
             os.makedirs(layers_dir, exist_ok=True)
-            stack.create_images_from_layers_at(layers_dir)
+            storage.redraw_all_images(stack)
             stack.save_pickle(os.path.join(user_path, "layers.pickle"))
 
             # Write metadata (minimal schema)
@@ -238,7 +238,7 @@ def open_by_pid():
         if need_images and os.path.exists(pickle_path):
             stack = LayerStack.LayerStack(0, 0)
             if stack.load_pickle(pickle_path):
-                stack.create_images_from_layers_at(layers_dir)
+                storage.redraw_all_images(stack)
     except Exception:
         pass
 

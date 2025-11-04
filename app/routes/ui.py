@@ -53,7 +53,7 @@ def open_new_project():
     # TODO: layer size based on user input
     stack = LayerStack.LayerStack(500, 500)
     stack.add_base_layers()
-    stack.create_images_from_layers_at(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers")
+    storage.redraw_all_images(stack)
     storage.save_layers(stack)
     return redirect(url_for("ui.editor"))
 

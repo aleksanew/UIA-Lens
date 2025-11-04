@@ -5,6 +5,8 @@ import json, uuid, shutil
 import pickle
 from pathlib import Path
 from io import BytesIO
+
+import cv2
 from PIL import Image
 from flask import session, current_app
 from app.models import LayerStack
@@ -35,7 +37,9 @@ def save_project(root: str, meta: dict) -> None:
     p = Path(root) / meta["id"] / "project.json"
     p.write_text(json.dumps(meta))
 
-def load_layers() -> LayerStack.LayerStack or None:
+
+
+def load_layers() -> LayerStack.LayerStack | None:
     pid = session["pid"]
     stack = LayerStack.LayerStack(0, 0)
     if stack.load_pickle(f"{_root()}/{pid}/layers.pickle"):
@@ -46,6 +50,25 @@ def load_layers() -> LayerStack.LayerStack or None:
 def save_layers(stack: LayerStack.LayerStack) -> bool:
     pid = session["pid"]
     return stack.save_pickle(f"{_root()}/{pid}/layers.pickle")
+
+
+# Turns selected layer into png to display on webpage
+def redraw_selected_image(stack: LayerStack.LayerStack):
+    i = stack.selected_layer()
+    layer = stack.get_current_layer()
+    img = layer.get_image()
+    cv2.imwrite(f"{user_path()}/layers/Layer{i}.png", img)
+    return
+
+# Turns all image arrays into png to display on webpage
+def redraw_all_images(stack: LayerStack.LayerStack):
+    size = stack.size()
+    for i in range(size):
+        layer = stack.at(i)
+        img = layer.get_image()
+        cv2.imwrite(f"{user_path()}/layers/Layer{i}.png", img)
+    return
+
 
 def user_path() -> str:
     pid = session["pid"]
