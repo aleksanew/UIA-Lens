@@ -60,6 +60,7 @@ async function undo(){
     await fetch("/api/v1/tools/undo", {
     method: "POST"
     });
+
     location.reload();
 }
 

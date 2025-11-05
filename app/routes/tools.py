@@ -255,16 +255,17 @@ def text():
     return _update_and_save(stack, layer_path)
 
 
-#TODO make buttons gray
 @bp.post("/undo")
 def undo():
-
-
+    storage.decrement_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
     return jsonify({"status": "ok"}), 200
 
 
 @bp.post("/redo")
 def redo():
-
-
+    storage.increment_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
     return jsonify({"status": "ok"}), 200
