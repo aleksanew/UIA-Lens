@@ -166,7 +166,7 @@ def apply_selection():
         layer = stack.get_current_layer()
         layer.update(src_image)
         storage.save_layers(stack)
-        storage.redraw_selected_image(stack)
+        #storage.redraw_selected_image(stack)
     
     stack = storage.load_layers()
     dst_layer = stack.get_current_layer()
@@ -209,7 +209,7 @@ def apply_selection():
     layer = stack.get_current_layer()
     layer.update(dst_image)
     storage.save_layers(stack)
-    storage.redraw_selected_image(stack)
+    #storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
 
@@ -276,6 +276,6 @@ def delete_selection():
     layer = stack.get_current_layer()
     layer.update(res_image)
     storage.save_layers(stack)
-    storage.redraw_selected_image(stack)
+    #storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
