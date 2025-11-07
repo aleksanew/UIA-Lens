@@ -108,7 +108,7 @@ def apply_selection():
     if mask is None:
         return jsonify({"error": "Failed to decode selection mask"}), 500
     
-    # Not sure if this is right i didnt really understand what to do here
+    # Not sure if this is right iidk pickle bortsett fra virkeligheten yucky!!!!
     src_layer_path = os.path.join(
         current_app.config.get("STORAGE_ROOT"),
         pid,
@@ -212,16 +212,26 @@ def apply_selection():
         dst_image[new_y:new_y+paste_h, new_x:new_x+paste_w] = blended
 
     # Save updated destination layer
-    cv2.imwrite(dst_layer_path, dst_image)
+    stack = storage.load_layers()
+    layer = stack.get_current_layer()
+    layer.update(dst_image)
+    storage.save_layers(stack)
+    storage.redraw_selected_image(stack)
+    #cv2.imwrite(dst_layer_path, dst_image)
 
     return jsonify({"status": "ok"}), 200
 
 # trenger greier her for å passe på at layer_stack er oppdatert og lagret
+# eg vet ikke hvordan lagring virker men det ser ut som det virker
         
 # spørsmål om line 107 og 166 og 170 og 211
 
 @bp.post("/delete")
 def delete_selection():
     pid = session.get("pid")
+
+
+
     return jsonify({"status": "ok"}), 200
+
     #stuff
