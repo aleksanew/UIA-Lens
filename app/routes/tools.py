@@ -253,3 +253,19 @@ def text():
         return jsonify({"error": f"Tool '{text}' failed: {e}"}), 500
 
     return _update_and_save(stack, layer_path)
+
+
+@bp.post("/undo")
+def undo():
+    storage.decrement_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
+    return jsonify({"status": "ok"}), 200
+
+
+@bp.post("/redo")
+def redo():
+    storage.increment_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
+    return jsonify({"status": "ok"}), 200

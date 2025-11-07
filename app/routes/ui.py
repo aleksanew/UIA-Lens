@@ -48,12 +48,11 @@ def layer_img(filename):
 # export images to user storage, save canvas in user storage
 @bp.get("/open_new_project")
 def open_new_project():
-    pid = storage.new_project(current_app.config.get("STORAGE_ROOT"), "new project")
-    session["pid"] = pid
+    storage.init_session()
     # TODO: layer size based on user input
     stack = LayerStack.LayerStack(500, 500)
     stack.add_base_layers()
-    stack.create_images_from_layers_at(f"{current_app.config.get('STORAGE_ROOT')}/{pid}/layers")
+    storage.redraw_all_images(stack)
     storage.save_layers(stack)
     return redirect(url_for("ui.editor"))
 
@@ -63,9 +62,7 @@ def open_new_project():
 def open_loaded_project():
     # create empty canvas in new storage folder
     # save id in session
-    pid = storage.new_project("users", "new project")
-    session["pid"] = pid
+    storage.init_session()
     # TODO: FILE: get pickle file from user and save under users/pid
 
     return redirect(url_for("ui.editor"))
-
