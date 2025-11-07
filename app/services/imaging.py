@@ -79,7 +79,13 @@ def magic_lasso_select(image_id, seed_points):
     if len(path) >= 3:
         cv2.fillPoly(mask, [path], 255) # Fill polygon defined by path
     return encode_mask(mask)
-# Soltution chosen to be lightweight but not very good at all, will improve
+
+def decode_mask(mask_data: str) -> np.ndarray:
+    """Decode base64 PNG mask to numpy array."""
+    mask_bytes = base64.b64decode(mask_data)
+    nparr = np.frombuffer(mask_bytes, np.uint8)
+    mask = cv2.imdecode(nparr, cv2.IMREAD_GRAYSCALE)
+    return mask
 
 # def brush_stroke(...): ...
 # def eraser_stroke(...): ...

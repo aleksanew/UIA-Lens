@@ -43,6 +43,27 @@ state.shape.fillEnabled = true;
 const BRUSH_SPACING = { default: 0.25, star: 3 };
 const currentSize = () => (state.tool === "eraser" ? state.eraserSize : state.brushSize);
 
+state.selection = {
+  active: false,      // Whether an active selection exists
+  type: null,         // 'rect', 'freeform', 'polygonal', 'magic-lasso'
+  coords: null,       // For rect selection: [x1, y1, x2, y2]
+  path: null,         // For freeform [[x1,y1], [x2,y2], ...] makes it easier to not combine these two i think
+  vertices: null,     // For polygonal [[x1,y1], [x2,y2], ...]
+  seed_points: null,  // For magic lasso
+  mask: null,         // Base64 mask from server (optional)
+  preview: {
+    start: null,      // Starting point for rect selection
+    current: null,    // Current mouse position
+    points: []        // For polygonal/freeform
+  },
+  transform: {
+    dx: 0,            // Offset from original position
+    dy: 0,
+    scaleX: 1.0,
+    scaleY: 1.0
+  }
+};
+
 function setupCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const w = +canvas.getAttribute("width");
@@ -531,6 +552,34 @@ function drawSegment(a, b) {
   }
 }
 
+function drawSelectionPreview() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (state.tool === "select_rect" && state.selection.preview.start && state.selection.preview.current) {
+    const start = state.selection.preview.start;
+    const current = state.selection.preview.current;
+
+    const x = Math.min(start.x, current.x);
+    const y = Math.min(start.y, current.y);
+    const w = Math.abs(current.x - start.x);
+    const h = Math.abs(current.y - start.y);
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";  // Blue selection outline
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
+
+  // similar for the other selection types...
+}
+
+function drawSelectionMask() {
+  // Add logic to draw later
+
+  console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
+}
 
 async function postJSON(url, payload) {
   const res = await fetch(url, {
@@ -619,6 +668,42 @@ async function sendPickColor(x, y) {
     setActiveTool("brush");
   } catch (e) {
     console.error("Dropper failed:", e.message);
+  }
+}
+
+async function fetchSelectionMask() {
+  if (!state.selection.active) return;
+  
+  const payload = { image_id: "current"};
+
+  if (state.selection.type === "rect") {
+    payload.coords = state.selection.coords;
+  } else if (state.selection.type === "freeform") {
+    payload.path = state.selection.path;
+  } else if (state.selection.type === "polygonal") {
+    payload.vertices = state.selection.vertices;
+  } else if (state.selection.type === "magic-lasso") {
+    payload.seed_points = state.selection.seed_points;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/select/${state.selection.type}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      console.error("Selection fetch failed:", await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    state.selection.mask = data.mask; // base64 mask
+
+    drawSelectionMask();
+  } catch (err) {
+    console.error("Selection fetch error:", err);
   }
 }
 
@@ -727,6 +812,30 @@ document.addEventListener("click", (e) => {
   if (tool === "bucket") {
     setActiveTool("bucket");
     bucketColorPicker?.click?.();
+    return;
+  }
+
+  if (tool === "select_rect") {
+    setActiveTool("select_rect");
+    state.selection.type = "rect";
+    return;
+  }
+
+  if (tool === "select_freeform") {
+    setActiveTool("select_freeform");
+    state.selection.type = "freeform";
+    return;
+  }
+
+  if (tool === "select_polygonal") {
+    setActiveTool("select_polygonal");
+    state.selection.type = "polygonal";
+    return;
+  }
+
+  if (tool === "select_magic_lasso") {
+    setActiveTool("select_magic_lasso");
+    state.selection.type = "magic-lasso";
     return;
   }
 
@@ -859,6 +968,14 @@ canvas.addEventListener("pointerdown", async (e) => {
     state.drawing = true;
     state.points = [getCanvasXY(e)];
   }
+
+  if (state.tool === "select_rect") {
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.start = { x, y };
+    state.drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
 });
 
 brushTypeSelect?.addEventListener("change", (e) => {
@@ -874,6 +991,14 @@ canvas.addEventListener("pointermove", (e) => {
     if (state.shape.mode === "rect")    drawPreviewRect(a, b);
     if (state.shape.mode === "ellipse") drawPreviewEllipse(a, b);
     if (state.shape.mode === "line")    drawPreviewLine(a, b);
+    return;
+  }
+
+  if (state.tool === "select_rect") {
+    if (!state.drawing) return;
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.current = { x, y };
+    drawSelectionPreview();
     return;
   }
 
@@ -930,6 +1055,28 @@ canvas.addEventListener("pointerup", async (e) => {
     }
     return;
   }
+
+  if (state.tool === "select_rect") {
+    const [x, y] = getCanvasXY(e);
+    const start = state.selection.preview.start;
+
+    // Selection coords
+    state.selection.coords = [
+      Math.min(start.x, x),
+      Math.min(start.y, y),
+      Math.max(start.x, x),
+      Math.max(start.y, y)
+    ];
+
+    state.selection.active = true;
+    state.drawing = false;
+
+    // Optional for fetching selection mask from server
+    await fetchSelectionMask();
+
+    canvas.releasePointerCapture(e.pointerId);
+    return;
+    }
 
   if (!state.drawing) return;
   state.drawing = false;
