@@ -555,7 +555,36 @@ function drawSegment(a, b) {
 function drawSelectionPreview() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (state.tool === "select_rect" && state.selection.preview.start && state.selection.preview.current) {
+  if (state.tool === "select-rect" && state.selection.active && state.selection.coords) {
+    // Draw the selection rectangle with transform applied
+    const [x1, y1, x2, y2] = state.selection.coords;
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+    
+    const x = x1 + dx;
+    const y = y1 + dy;
+    const w = x2 - x1;
+    const h = y2 - y1;
+    
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";  // Blue selection outline
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);      // Dashed line
+    ctx.strokeRect(x, y, w, h);
+    
+    // Draw corner handles for visual feedback
+    const handleSize = 6;
+    ctx.fillStyle = "#00aaff";
+    ctx.fillRect(x - handleSize/2, y - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x + w - handleSize/2, y - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x + w - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
+    
+    ctx.restore();
+  }
+  
+  // Also handle preview while drawing (before committed)
+  if (state.tool === "select-rect" && state.selection.preview.start && state.selection.preview.current) {
     const start = state.selection.preview.start;
     const current = state.selection.preview.current;
 
@@ -565,20 +594,33 @@ function drawSelectionPreview() {
     const h = Math.abs(current.y - start.y);
 
     ctx.save();
-    ctx.strokeStyle = "#00aaff";  // Blue selection outline
+    ctx.strokeStyle = "#00aaff";
     ctx.lineWidth = 2;
-    ctx.setLineDash([5, 5]); // Dashed line
+    ctx.setLineDash([5, 5]);
     ctx.strokeRect(x, y, w, h);
     ctx.restore();
   }
-
-  // similar for the other selection types...
 }
 
 function drawSelectionMask() {
   // Add logic to draw later
 
   console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
+}
+
+function clearSelection() {
+  state.selection.active = false;
+  state.selection.coords = null;
+  state.selection.mask = null;
+  state.selection.copied = false;
+  state.selection.isCut = false;
+  state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
+  state.selection.preview = { start: null, current: null, points: [] };
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
+
+function cancelSelection() {
+  clearSelection();
 }
 
 async function postJSON(url, payload) {
@@ -706,6 +748,91 @@ async function fetchSelectionMask() {
     console.error("Selection fetch error:", err);
   }
 }
+
+async function copySelection() {
+  if (!state.selection.active) return;
+
+  state.selection.copied = true;
+  // Maybe something visual
+}
+
+async function cutSelection() {
+  if (!state.selection.active) return;
+  state.selection.copied = true;
+  state.selection.isCut = true;
+  // Maybe something visual
+}
+
+async function pasteSelection() {
+  if (!state.selection.copied) return;
+
+  const operation = state.selection.isCut ? "move" : "copy";
+
+  try {
+    const res = await fetch("/api/v1/select/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: operation,
+        selection: {
+          type: state.selection.type,
+          coords: state.selection.coords,
+          // other selection data as needed
+        },
+        transform: state.selection.transform,
+        // source/dest perhaps
+      })
+    });
+
+    if (!res.ok) {
+      console.error("Paste selection failed:", await res.text());
+      return;
+    }
+
+    // Show changes
+    reloadImage();
+
+    // Clear selection after cut, keep otherwise
+    if (state.selection.isCut) {
+      clearSelection();
+    }
+  } catch (err) {
+    console.error("Paste selection error:", err);
+  }
+}
+
+async function commitSelection() {
+  if (!state.selection.active) return;
+  
+  const operation = state.selection.isCut ? "move" : "copy";
+  
+  try {
+    const res = await fetch("/api/v1/select/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: operation,
+        selection: {
+          type: state.selection.type,
+          coords: state.selection.coords,
+        },
+        transform: state.selection.transform,
+      })
+    });
+    
+    if (!res.ok) {
+      console.error("Commit failed:", await res.text());
+      return;
+    }
+    
+    reloadImage();
+    clearSelection();
+    
+  } catch (err) {
+    console.error("Commit error:", err);
+  }
+}
+
 
 
 // tool selection and UI
@@ -1091,6 +1218,55 @@ canvas.addEventListener("pointercancel", () => {
 });
 
 canvas.addEventListener("dragstart", (e) => e.preventDefault());
+
+document.addEventListener("keydown", async (e) => {
+  // can add keybinds for undo here
+  // Only if there is an active selection
+  if (!state.selection.active) return;
+
+  // CTRL+C - copy
+  if (e.ctrlKey && e.key === "c") {
+    e.preventDefault();
+    await copySelection();
+    return;
+  }
+
+  // CTRL+X - cut/move
+  if (e.ctrlKey && e.key === "x") {
+    e.preventDefault();
+    await cutSelection();
+    return;
+  }
+
+  // CTRL+V - paste
+  if (e.ctrlKey && e.key === "v") {
+    e.preventDefault();
+    await pasteSelection();
+    return;
+  }
+
+  // Delete - clear selection
+  if (e.key === "Delete" || e.key === "Backspace") {
+    e.preventDefault();
+    await clearSelection();
+    return;
+  }
+
+  // Enter - commit current transform
+  if (e.key === "Enter") {
+    e.preventDefault();
+    await commitSelection();
+    return;
+  }
+
+  // Escape - cancel selection
+  if (e.key === "Escape") {
+    e.preventDefault();
+    cancelSelection();
+    return;
+  }
+});
+
 
 setActiveTool("brush");
 updateShapeUI();
