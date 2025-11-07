@@ -64,6 +64,7 @@ state.selection = {
   },
   isDragging: false,
   dragStart: null,
+  isPasted: false,
 };
 
 function setupCanvas() {
@@ -621,13 +622,10 @@ function clearSelection() {
   state.selection.mask = null;
   state.selection.copied = false;
   state.selection.isCut = false;
+  state.selection.isPasted = false;
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
   state.selection.preview = { start: null, current: null, points: [] };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-}
-
-function cancelSelection() {
-  clearSelection();
 }
 
 async function postJSON(url, payload) {
@@ -790,6 +788,7 @@ async function pasteSelection() {
   state.selection.type = state.selection.clipboard.type;
   state.selection.active = true;
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
+  state.selection.isPasted = true;
 
   drawSelectionPreview();
 
@@ -799,7 +798,18 @@ async function pasteSelection() {
 async function commitSelection() {
   if (!state.selection.active) return;
   
-  const operation = state.selection.isCut ? "move" : "copy";
+  let operation;
+
+if (state.selection.isPasted) {
+    operation = "copy";
+  } else if (state.selection.isCut) {
+    operation = "move";
+  } else if (state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    operation = "move";
+  } else {
+    clearSelection();
+    return; // No operation to commit
+  }
   
   try {
     const res = await fetch("/api/v1/select/apply", {
@@ -821,14 +831,40 @@ async function commitSelection() {
     }
 
     reloadImage();
-    if (operation === "copy") {
-      state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
-    } else {
-      clearSelection();
-    }
+    clearSelection();
     
   } catch (err) {
     console.error("Commit error:", err);
+  }
+}
+
+async function deleteSelection() {
+  if (!state.selection.active) return;
+
+
+  // havent made delete endpoint yet
+  try {
+    const res = await fetch("/api/v1/select/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "move",
+        selection: {
+          type: state.selection.type,
+          coords: state.selection.coords,
+        },
+      })
+    });
+    if (!res.ok) {
+      console.error("Delete failed:", await res.text());
+      return;
+    }
+
+    reloadImage();
+    clearSelection();
+
+  } catch (err) {
+    console.error("Delete error:", err);
   }
 }
 
@@ -1295,7 +1331,7 @@ document.addEventListener("keydown", async (e) => {
   // Delete - clear selection
   if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
-    await clearSelection();
+    await deleteSelection();
     return;
   }
 
@@ -1309,7 +1345,7 @@ document.addEventListener("keydown", async (e) => {
   // Escape - cancel selection
   if (e.key === "Escape") {
     e.preventDefault();
-    cancelSelection();
+    await clearSelection();
     return;
   }
 });

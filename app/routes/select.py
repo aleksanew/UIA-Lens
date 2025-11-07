@@ -219,3 +219,9 @@ def apply_selection():
 # trenger greier her for å passe på at layer_stack er oppdatert og lagret
         
 # spørsmål om line 107 og 166 og 170 og 211
+
+@bp.post("/delete")
+def delete_selection():
+    pid = session.get("pid")
+    return jsonify({"status": "ok"}), 200
+    #stuff
