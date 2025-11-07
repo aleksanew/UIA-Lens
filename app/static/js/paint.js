@@ -760,52 +760,40 @@ async function copySelection() {
   if (!state.selection.active) return;
 
   state.selection.copied = true;
-  // Maybe something visual
+  state.selection.isCut = false;
+
+  // Store original for pasting
+  state.selection.clipboard = {
+    type: state.selection.type,
+    coords: [...state.selection.coords]
+  };
 }
 
 async function cutSelection() {
   if (!state.selection.active) return;
+
   state.selection.copied = true;
   state.selection.isCut = true;
-  // Maybe something visual
+  state.selection.clipboard = {
+    type: state.selection.type,
+    coords: [...state.selection.coords]
+  };
+
+  // Visual feedback that its cut so dim area or those fancy edges stuff like that
 }
 
 async function pasteSelection() {
-  if (!state.selection.copied) return;
+  if (!state.selection.copied || !state.selection.clipboard) return;
 
-  const operation = state.selection.isCut ? "move" : "copy";
+  // For now, just restore at original position might add restore on mouse pointer
+  state.selection.coords = [...state.selection.clipboard.coords];
+  state.selection.type = state.selection.clipboard.type;
+  state.selection.active = true;
+  state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
 
-  try {
-    const res = await fetch("/api/v1/select/apply", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        operation: operation,
-        selection: {
-          type: state.selection.type,
-          coords: state.selection.coords,
-          // other selection data as needed
-        },
-        transform: state.selection.transform,
-        // source/dest perhaps
-      })
-    });
+  drawSelectionPreview();
 
-    if (!res.ok) {
-      console.error("Paste selection failed:", await res.text());
-      return;
-    }
-
-    // Show changes
-    reloadImage();
-
-    // Clear selection after cut, keep otherwise
-    if (state.selection.isCut) {
-      clearSelection();
-    }
-  } catch (err) {
-    console.error("Paste selection error:", err);
-  }
+  // commit on user enter or click off
 }
 
 async function commitSelection() {
@@ -831,16 +819,18 @@ async function commitSelection() {
       console.error("Commit failed:", await res.text());
       return;
     }
-    
+
     reloadImage();
-    clearSelection();
+    if (operation === "copy") {
+      state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
+    } else {
+      clearSelection();
+    }
     
   } catch (err) {
     console.error("Commit error:", err);
   }
 }
-
-
 
 // tool selection and UI
 function setToolColor(tool, hex) {
