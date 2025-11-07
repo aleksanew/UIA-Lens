@@ -61,7 +61,9 @@ state.selection = {
     dy: 0,
     scaleX: 1.0,
     scaleY: 1.0
-  }
+  },
+  isDragging: false,
+  dragStart: null,
 };
 
 function setupCanvas() {
@@ -402,6 +404,11 @@ function reloadImage() {
   imgEl.addEventListener("load", function onload() {
     imgEl.removeEventListener("load", onload);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Redraw selection if active
+    if (state.selection.active) {
+      drawSelectionMask();
+    }
   });
   imgEl.src = `${base}?t=${Date.now()}`;
 }
@@ -555,7 +562,7 @@ function drawSegment(a, b) {
 function drawSelectionPreview() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (state.tool === "select-rect" && state.selection.active && state.selection.coords) {
+  if (state.tool === "select_rect" && state.selection.active && state.selection.coords) {
     // Draw the selection rectangle with transform applied
     const [x1, y1, x2, y2] = state.selection.coords;
     const dx = state.selection.transform.dx;
@@ -584,7 +591,7 @@ function drawSelectionPreview() {
   }
   
   // Also handle preview while drawing (before committed)
-  if (state.tool === "select-rect" && state.selection.preview.start && state.selection.preview.current) {
+  if (state.tool === "select_rect" && state.selection.preview.start && state.selection.preview.current) {
     const start = state.selection.preview.start;
     const current = state.selection.preview.current;
 
@@ -1096,7 +1103,26 @@ canvas.addEventListener("pointerdown", async (e) => {
     state.points = [getCanvasXY(e)];
   }
 
+  if (state.selection.active && state.selection.coords) {
+    const [mouseX, mouseY] = getCanvasXY(e);
+    const [x1, y1, x2, y2] = state.selection.coords;
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    // Check if click is inside selection bounds
+    if (mouseX >= x1 + dx && mouseX <= x2 + dx && mouseY >= y1 + dy && mouseY <= y2 + dy) {
+      state.selection.isDragging = true;
+      state.selection.dragStart = { x: mouseX, y: mouseY };
+      state.selection.initialTransform = { ...state.selection.transform };
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+
   if (state.tool === "select_rect") {
+    // Clear previous selection
+    clearSelection();
+
     const [x, y] = getCanvasXY(e);
     state.selection.preview.start = { x, y };
     state.drawing = true;
@@ -1121,6 +1147,19 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
 
+  // Dragging active selection
+  if (state.selection.isDragging && state.selection.dragStart && state.selection.initialTransform) {
+    const [mouseX, mouseY] = getCanvasXY(e);
+    const dragDx = mouseX - state.selection.dragStart.x;
+    const dragDy = mouseY - state.selection.dragStart.y;
+
+    state.selection.transform.dx = state.selection.initialTransform.dx + dragDx;
+    state.selection.transform.dy = state.selection.initialTransform.dy + dragDy;
+
+    drawSelectionPreview();
+    return;
+  }
+
   if (state.tool === "select_rect") {
     if (!state.drawing) return;
     const [x, y] = getCanvasXY(e);
@@ -1135,6 +1174,8 @@ canvas.addEventListener("pointermove", (e) => {
   const last = state.points[state.points.length - 1];
   drawSegment(last, p);
   state.points.push(p);
+
+  
 });
 
 
@@ -1183,6 +1224,14 @@ canvas.addEventListener("pointerup", async (e) => {
     return;
   }
 
+  // Stop dragging selection
+  if (state.selection.isDragging) {
+    state.selection.isDragging = false;
+    state.selection.dragStart = null;
+    canvas.releasePointerCapture(e.pointerId);
+    return;
+  }
+
   if (state.tool === "select_rect") {
     const [x, y] = getCanvasXY(e);
     const start = state.selection.preview.start;
@@ -1198,12 +1247,20 @@ canvas.addEventListener("pointerup", async (e) => {
     state.selection.active = true;
     state.drawing = false;
 
+    // Clear preview since we have final data now
+    state.selection.preview.start = null;
+    state.selection.preview.current = null;
+
     // Optional for fetching selection mask from server
     await fetchSelectionMask();
+
+    drawSelectionPreview();
+
 
     canvas.releasePointerCapture(e.pointerId);
     return;
     }
+
 
   if (!state.drawing) return;
   state.drawing = false;
