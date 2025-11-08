@@ -209,14 +209,10 @@ def apply_selection():
     layer = stack.get_current_layer()
     layer.update(dst_image)
     storage.save_layers(stack)
-    #storage.redraw_selected_image(stack)
+    storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
 
-# trenger greier her for å passe på at layer_stack er oppdatert og lagret
-# eg vet ikke hvordan lagring virker men det ser ut som det virker
-        
-# spørsmål om line 107 og 166 og 170 og 211
 
 @bp.post("/delete")
 def delete_selection():
@@ -276,6 +272,6 @@ def delete_selection():
     layer = stack.get_current_layer()
     layer.update(res_image)
     storage.save_layers(stack)
-    #storage.redraw_selected_image(stack)
+    storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
