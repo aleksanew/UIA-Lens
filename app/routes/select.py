@@ -108,16 +108,11 @@ def apply_selection():
     if mask is None:
         return jsonify({"error": "Failed to decode selection mask"}), 500
     
-    # Not sure if this is right iidk pickle bortsett fra virkeligheten yucky!!!!
-    src_layer_path = os.path.join(
-        current_app.config.get("STORAGE_ROOT"),
-        pid,
-        "layers",
-        f"Layer{src_layer}.png"
-    )
-    src_image = cv2.imread(src_layer_path, cv2.IMREAD_UNCHANGED)
+    stack = storage.load_layers()
+    src_layer = stack.get_current_layer()
+    src_image = src_layer.get_image()
     if src_image is None:
-        return jsonify({"error": f"Failed to load source layer image at {src_layer_path}"}), 500
+        return jsonify({"error": f"Failed to load source layer image at {src_layer}"}), 500
     
     if src_image.ndim == 2:
         src_image = cv2.cvtColor(src_image, cv2.COLOR_GRAY2BGRA)
@@ -167,19 +162,17 @@ def apply_selection():
             src_image[y:y+h, x:x+w],
             cv2.bitwise_not(mask_4channel)
         )
-        # Endre til save_layers? må spørre om det
-        cv2.imwrite(src_layer_path, src_image)
+        stack = storage.load_layers()
+        layer = stack.get_current_layer()
+        layer.update(src_image)
+        storage.save_layers(stack)
+        #storage.redraw_selected_image(stack)
     
-    # Paste selected region onto destination layer
-    dst_layer_path = os.path.join(
-        current_app.config.get("STORAGE_ROOT"),
-        pid,
-        "layers",
-        f"Layer{dst_layer}.png"
-    )
-    dst_image = cv2.imread(dst_layer_path, cv2.IMREAD_UNCHANGED)
+    stack = storage.load_layers()
+    dst_layer = stack.get_current_layer()
+    dst_image = dst_layer.get_image()
     if dst_image is None:
-        return jsonify({"error": f"Failed to load destination layer image at {dst_layer_path}"}), 500
+        return jsonify({"error": f"Failed to load destination layer image at {dst_layer}"}), 500
     
     # Ensure format
     if dst_image.ndim == 2:
@@ -216,8 +209,7 @@ def apply_selection():
     layer = stack.get_current_layer()
     layer.update(dst_image)
     storage.save_layers(stack)
-    storage.redraw_selected_image(stack)
-    #cv2.imwrite(dst_layer_path, dst_image)
+    #storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
 
@@ -229,9 +221,61 @@ def apply_selection():
 @bp.post("/delete")
 def delete_selection():
     pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "Not logged in / missing pid"}), 401
+    
+    data = request.get_json()
+    if not data or 'selection' not in data:
+        return jsonify({"error": "Missing selection"}), 400
 
+    selection = data.get('selection')
 
+    stack = storage.load_layers()
+    src_layer = stack.get_current_layer()
+    src_image = src_layer.get_image()
+    if src_image is None:
+        return jsonify({"error": f"Failed to load source layer image at {src_layer}"}), 500
+
+    sel_type = selection.get('type')
+    try:
+        if sel_type == 'rect':
+            mask_base64 = rectangular_select(pid, selection['coords'])
+        elif sel_type == 'freeform':
+            mask_base64 = freeform_select(pid, selection['path'])
+        elif sel_type == 'polygonal':
+            mask_base64 = polygonal_select(pid, selection['vertices'])
+        elif sel_type == 'magic-lasso':
+            mask_base64 = magic_lasso_select(pid, selection['seed_points'])
+        else:
+            return jsonify({"error": f"Unknown selection type: {sel_type}"}), 400
+    except Exception as e:
+        return jsonify({"error": f"Selection failed: {e}"}), 500
+
+    mask = decode_mask(mask_base64)
+    if mask is None:
+        return jsonify({"error": "Failed to decode selection mask"}), 500
+    
+    if src_image.ndim == 2:
+        src_image = cv2.cvtColor(src_image, cv2.COLOR_GRAY2BGRA)
+    elif src_image.shape[2] == 3:
+        src_image = cv2.cvtColor(src_image, cv2.COLOR_BGR2BGRA)
+
+    # Ensure mask is same size as source image
+    src_h, src_w = src_image.shape[:2]
+    mask_h, mask_w = mask.shape[:2]
+    
+    if mask_h != src_h or mask_w != src_w:
+        # Resize mask to match source image
+        mask = cv2.resize(mask, (src_w, src_h), interpolation=cv2.INTER_NEAREST)
+    
+
+    mask_4channel = cv2.merge([mask, mask, mask, mask])
+    res_image = cv2.bitwise_and(src_image, cv2.bitwise_not(mask_4channel))
+                                
+    stack = storage.load_layers()
+    layer = stack.get_current_layer()
+    layer.update(res_image)
+    storage.save_layers(stack)
+    #storage.redraw_selected_image(stack)
 
     return jsonify({"status": "ok"}), 200
-
-    #stuff

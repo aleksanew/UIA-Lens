@@ -3,19 +3,10 @@ import numpy as np
 import cv2
 import base64
 from flask import current_app
-
-def process_image(image_id):
-    """Load image from storage based on image_id?"""
-    """Not sure how this works yet, placeholder for now"""
-    img = cv2.imread('tests/test_image.png')
-    return img
+from app.services import storage
 
 # def apply_grayscale(...): ...
 # def apply_gaussian(...): ...
-
-def create_mask(height, width):
-    """Helper to create a blank mask."""
-    return np.zeros((height, width), dtype=np.uint8)
 
 def encode_mask(mask):
     """Encode mask as base64 PNG."""
@@ -23,32 +14,41 @@ def encode_mask(mask):
     return base64.b64encode(buffer).decode('utf-8')
 
 def rectangular_select(image_id, coords):
-    img = process_image(image_id) # Load image
-    height, width = img.shape[:2] # Get dimensions
-    x1, y1, x2, y2 = coords # Unpack coords
-    mask = create_mask(height, width) # Create blank mask
+    stack = storage.load_layers()
+    height, width = stack.shape()  # Get actual layer dimensions
+    x1, y1, x2, y2 = map(int,coords) # Unpack coords
+    x1 = max(0, min(x1, width  - 1))
+    x2 = max(0, min(x2, width  - 1))
+    y1 = max(0, min(y1, height - 1))
+    y2 = max(0, min(y2, height - 1))
+    mask = np.zeros((height, width), dtype=np.uint8)
     cv2.rectangle(mask, (x1, y1), (x2, y2), 255, -1) # Fill rectangle on mask
-    return encode_mask(mask)
+    _, buffer = cv2.imencode('.png', mask)
+    return base64.b64encode(buffer).decode('utf-8')
 
 def freeform_select(image_id, path):
-    img = process_image(image_id)
-    height, width = img.shape[:2]
+    stack = storage.load_layers()
+    height, width = stack.shape()
     path = np.array(path, np.int32) # Convert path to numpy array
-    mask = create_mask(height, width)
+    mask = np.zeros((height, width), dtype=np.uint8)
     cv2.fillPoly(mask, [path], 255) # Fill polygon defined by path
-    return encode_mask(mask)
+    _, buffer = cv2.imencode('.png', mask)
+    return base64.b64encode(buffer).decode('utf-8')
 
 def polygonal_select(image_id, vertices):
-    img = process_image(image_id)
-    height, width = img.shape[:2]
+    stack = storage.load_layers()
+    height, width = stack.shape()
     vertices = np.array(vertices, np.int32) # Convert vertices to numpy array
-    mask = create_mask(height, width)
+    mask = np.zeros((height, width), dtype=np.uint8)
     cv2.fillPoly(mask, [vertices], 255) # Fill polygon defined by vertices
-    return encode_mask(mask)
+    _, buffer = cv2.imencode('.png', mask)
+    return base64.b64encode(buffer).decode('utf-8')
 
 def magic_lasso_select(image_id, seed_points):
-    img = process_image(image_id)
-    height, width = img.shape[:2]
+    stack = storage.load_layers()
+    height, width = stack.shape()
+    layer = stack.get_current_layer()
+    img = layer.get_image()
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) # Grayscale
     edges = cv2.Canny(gray, 50, 150) # Edge detection, adjust thresholds as needed, but adjusting didnt seem to fix much its just bad
     path = []
@@ -75,10 +75,13 @@ def magic_lasso_select(image_id, seed_points):
             if not snapped: # if no edge found, just use original point
                 path.append(pt.tolist())
     path = np.array(path, np.int32) # Convert path to numpy array
-    mask = create_mask(height, width)
+    mask = np.zeros((height, width), dtype=np.uint8)
+    _, buffer = cv2.imencode('.png', mask)
     if len(path) >= 3:
         cv2.fillPoly(mask, [path], 255) # Fill polygon defined by path
-    return encode_mask(mask)
+    return base64.b64encode(buffer).decode('utf-8')
+
+# a good bit of redundancy here to fix, sucks to suck later me.
 
 def decode_mask(mask_data: str) -> np.ndarray:
     """Decode base64 PNG mask to numpy array."""
