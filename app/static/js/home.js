@@ -95,8 +95,14 @@
 async function redirectNew(){
     let w = prompt("Canvas width in pixels");
     let h = prompt("Canvas height in pixels")
-    // let h=500
-    // let w=500
+    let pw = parseInt(w)
+    let ph = parseInt(h)
+    if (p != pw || pw < 1){
+        w = 500;
+    }
+    if (h != ph || ph < 1){
+        h = 500
+    }
     let res = await fetch("/api/v1/open_new_project", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
