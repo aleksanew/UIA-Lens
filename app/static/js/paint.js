@@ -43,6 +43,30 @@ state.shape.fillEnabled = true;
 const BRUSH_SPACING = { default: 0.25, star: 3 };
 const currentSize = () => (state.tool === "eraser" ? state.eraserSize : state.brushSize);
 
+state.selection = {
+  active: false,      // Whether an active selection exists
+  type: null,         // 'rect', 'freeform', 'polygonal', 'magic-lasso'
+  coords: null,       // For rect selection: [x1, y1, x2, y2]
+  path: null,         // For freeform [[x1,y1], [x2,y2], ...] makes it easier to not combine these two i think
+  vertices: null,     // For polygonal [[x1,y1], [x2,y2], ...]
+  seed_points: null,  // For magic lasso
+  mask: null,         // Base64 mask from server (optional)
+  preview: {
+    start: null,      // Starting point for rect selection
+    current: null,    // Current mouse position
+    points: []        // For polygonal/freeform
+  },
+  transform: {
+    dx: 0,            // Offset from original position
+    dy: 0,
+    scaleX: 1.0,
+    scaleY: 1.0
+  },
+  isDragging: false,
+  dragStart: null,
+  isPasted: false,
+};
+
 function setupCanvas() {
   const dpr = window.devicePixelRatio || 1;
   const w = +canvas.getAttribute("width");
@@ -381,6 +405,11 @@ function reloadImage() {
   imgEl.addEventListener("load", function onload() {
     imgEl.removeEventListener("load", onload);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Redraw selection if active
+    if (state.selection.active) {
+      drawSelectionMask();
+    }
   });
   imgEl.src = `${base}?t=${Date.now()}`;
 }
@@ -531,6 +560,73 @@ function drawSegment(a, b) {
   }
 }
 
+function drawSelectionPreview() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (state.tool === "select_rect" && state.selection.active && state.selection.coords) {
+    // Draw the selection rectangle with transform applied
+    const [x1, y1, x2, y2] = state.selection.coords;
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+    
+    const x = x1 + dx;
+    const y = y1 + dy;
+    const w = x2 - x1;
+    const h = y2 - y1;
+    
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";  // Blue selection outline
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);      // Dashed line
+    ctx.strokeRect(x, y, w, h);
+    
+    // Draw corner handles for visual feedback
+    const handleSize = 6;
+    ctx.fillStyle = "#00aaff";
+    ctx.fillRect(x - handleSize/2, y - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x + w - handleSize/2, y - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
+    ctx.fillRect(x + w - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
+    
+    ctx.restore();
+  }
+  
+  // Also handle preview while drawing (before committed)
+  if (state.tool === "select_rect" && state.selection.preview.start && state.selection.preview.current) {
+    const start = state.selection.preview.start;
+    const current = state.selection.preview.current;
+
+    const x = Math.min(start.x, current.x);
+    const y = Math.min(start.y, current.y);
+    const w = Math.abs(current.x - start.x);
+    const h = Math.abs(current.y - start.y);
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(x, y, w, h);
+    ctx.restore();
+  }
+}
+
+function drawSelectionMask() {
+  // Add logic to draw later
+
+  console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
+}
+
+function clearSelection() {
+  state.selection.active = false;
+  state.selection.coords = null;
+  state.selection.mask = null;
+  state.selection.copied = false;
+  state.selection.isCut = false;
+  state.selection.isPasted = false;
+  state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
+  state.selection.preview = { start: null, current: null, points: [] };
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+}
 
 async function postJSON(url, payload) {
   const res = await fetch(url, {
@@ -622,6 +718,155 @@ async function sendPickColor(x, y) {
   }
 }
 
+async function fetchSelectionMask() {
+  if (!state.selection.active) return;
+  
+  const payload = { image_id: "current"};
+
+  if (state.selection.type === "rect") {
+    payload.coords = state.selection.coords;
+  } else if (state.selection.type === "freeform") {
+    payload.path = state.selection.path;
+  } else if (state.selection.type === "polygonal") {
+    payload.vertices = state.selection.vertices;
+  } else if (state.selection.type === "magic-lasso") {
+    payload.seed_points = state.selection.seed_points;
+  }
+
+  try {
+    const res = await fetch(`/api/v1/select/${state.selection.type}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      console.error("Selection fetch failed:", await res.text());
+      return;
+    }
+
+    const data = await res.json();
+    state.selection.mask = data.mask; // base64 mask
+
+    drawSelectionMask();
+  } catch (err) {
+    console.error("Selection fetch error:", err);
+  }
+}
+
+async function copySelection() {
+  if (!state.selection.active) return;
+
+  state.selection.copied = true;
+  state.selection.isCut = false;
+
+  // Store original for pasting
+  state.selection.clipboard = {
+    type: state.selection.type,
+    coords: [...state.selection.coords]
+  };
+}
+
+async function cutSelection() {
+  if (!state.selection.active) return;
+
+  state.selection.copied = true;
+  state.selection.isCut = true;
+  state.selection.clipboard = {
+    type: state.selection.type,
+    coords: [...state.selection.coords]
+  };
+
+  // Visual feedback that its cut so dim area or those fancy edges stuff like that
+}
+
+async function pasteSelection() {
+  if (!state.selection.copied || !state.selection.clipboard) return;
+
+  // For now, just restore at original position might add restore on mouse pointer
+  state.selection.coords = [...state.selection.clipboard.coords];
+  state.selection.type = state.selection.clipboard.type;
+  state.selection.active = true;
+  state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
+  state.selection.isPasted = true;
+
+  drawSelectionPreview();
+
+  // commit on user enter or click off
+}
+
+async function commitSelection() {
+  if (!state.selection.active) return;
+  
+  let operation;
+
+if (state.selection.isPasted) {
+    operation = "copy";
+  } else if (state.selection.isCut) {
+    operation = "move";
+  } else if (state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    operation = "move";
+  } else {
+    clearSelection();
+    return; // No operation to commit
+  }
+  
+  try {
+    const res = await fetch("/api/v1/select/apply", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: operation,
+        selection: {
+          type: state.selection.type,
+          coords: state.selection.coords,
+        },
+        transform: state.selection.transform,
+      })
+    });
+    
+    if (!res.ok) {
+      console.error("Commit failed:", await res.text());
+      return;
+    }
+
+    reloadImage();
+    clearSelection();
+    
+  } catch (err) {
+    console.error("Commit error:", err);
+  }
+}
+
+async function deleteSelection() {
+  if (!state.selection.active) return;
+
+
+  // havent made delete endpoint yet
+  try {
+    const res = await fetch("/api/v1/select/delete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "move",
+        selection: {
+          type: state.selection.type,
+          coords: state.selection.coords,
+        },
+      })
+    });
+    if (!res.ok) {
+      console.error("Delete failed:", await res.text());
+      return;
+    }
+
+    reloadImage();
+    clearSelection();
+
+  } catch (err) {
+    console.error("Delete error:", err);
+  }
+}
 
 // tool selection and UI
 function setToolColor(tool, hex) {
@@ -730,6 +975,30 @@ document.addEventListener("click", (e) => {
     return;
   }
 
+  if (tool === "select_rect") {
+    setActiveTool("select_rect");
+    state.selection.type = "rect";
+    return;
+  }
+
+  if (tool === "select_freeform") {
+    setActiveTool("select_freeform");
+    state.selection.type = "freeform";
+    return;
+  }
+
+  if (tool === "select_polygonal") {
+    setActiveTool("select_polygonal");
+    state.selection.type = "polygonal";
+    return;
+  }
+
+  if (tool === "select_magic_lasso") {
+    setActiveTool("select_magic_lasso");
+    state.selection.type = "magic-lasso";
+    return;
+  }
+
   // default tools (textbox, dropper, etc.)
   setActiveTool(tool);
 });
@@ -818,6 +1087,11 @@ canvas.addEventListener("pointerdown", async (e) => {
     await sendBucketFill(x, y);
     return;
   }
+  if (state.tool === "dropper") {
+    const [x, y] = getCanvasXY(e);
+    await sendPickColor(x, y);
+    return;
+  }
 
   if (state.tool === "textbox") {
       const [x, y] = getCanvasXY(e);
@@ -854,6 +1128,33 @@ canvas.addEventListener("pointerdown", async (e) => {
     state.drawing = true;
     state.points = [getCanvasXY(e)];
   }
+
+  if (state.selection.active && state.selection.coords) {
+    const [mouseX, mouseY] = getCanvasXY(e);
+    const [x1, y1, x2, y2] = state.selection.coords;
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    // Check if click is inside selection bounds
+    if (mouseX >= x1 + dx && mouseX <= x2 + dx && mouseY >= y1 + dy && mouseY <= y2 + dy) {
+      state.selection.isDragging = true;
+      state.selection.dragStart = { x: mouseX, y: mouseY };
+      state.selection.initialTransform = { ...state.selection.transform };
+      canvas.setPointerCapture(e.pointerId);
+      return;
+    }
+  }
+
+  if (state.tool === "select_rect") {
+    // Clear previous selection
+    clearSelection();
+
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.start = { x, y };
+    state.drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
 });
 
 brushTypeSelect?.addEventListener("change", (e) => {
@@ -872,12 +1173,35 @@ canvas.addEventListener("pointermove", (e) => {
     return;
   }
 
+  // Dragging active selection
+  if (state.selection.isDragging && state.selection.dragStart && state.selection.initialTransform) {
+    const [mouseX, mouseY] = getCanvasXY(e);
+    const dragDx = mouseX - state.selection.dragStart.x;
+    const dragDy = mouseY - state.selection.dragStart.y;
+
+    state.selection.transform.dx = state.selection.initialTransform.dx + dragDx;
+    state.selection.transform.dy = state.selection.initialTransform.dy + dragDy;
+
+    drawSelectionPreview();
+    return;
+  }
+
+  if (state.tool === "select_rect") {
+    if (!state.drawing) return;
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.current = { x, y };
+    drawSelectionPreview();
+    return;
+  }
+
   if (!state.drawing) return;
 
   const p = getCanvasXY(e);
   const last = state.points[state.points.length - 1];
   drawSegment(last, p);
   state.points.push(p);
+
+  
 });
 
 
@@ -926,6 +1250,44 @@ canvas.addEventListener("pointerup", async (e) => {
     return;
   }
 
+  // Stop dragging selection
+  if (state.selection.isDragging) {
+    state.selection.isDragging = false;
+    state.selection.dragStart = null;
+    canvas.releasePointerCapture(e.pointerId);
+    return;
+  }
+
+  if (state.tool === "select_rect") {
+    const [x, y] = getCanvasXY(e);
+    const start = state.selection.preview.start;
+
+    // Selection coords
+    state.selection.coords = [
+      Math.min(start.x, x),
+      Math.min(start.y, y),
+      Math.max(start.x, x),
+      Math.max(start.y, y)
+    ];
+
+    state.selection.active = true;
+    state.drawing = false;
+
+    // Clear preview since we have final data now
+    state.selection.preview.start = null;
+    state.selection.preview.current = null;
+
+    // Optional for fetching selection mask from server
+    await fetchSelectionMask();
+
+    drawSelectionPreview();
+
+
+    canvas.releasePointerCapture(e.pointerId);
+    return;
+    }
+
+
   if (!state.drawing) return;
   state.drawing = false;
   state.points.push(getCanvasXY(e));
@@ -939,6 +1301,55 @@ canvas.addEventListener("pointercancel", () => {
 });
 
 canvas.addEventListener("dragstart", (e) => e.preventDefault());
+
+document.addEventListener("keydown", async (e) => {
+  // can add keybinds for undo here
+  // Only if there is an active selection
+  if (!state.selection.active) return;
+
+  // CTRL+C - copy
+  if (e.ctrlKey && e.key === "c") {
+    e.preventDefault();
+    await copySelection();
+    return;
+  }
+
+  // CTRL+X - cut/move
+  if (e.ctrlKey && e.key === "x") {
+    e.preventDefault();
+    await cutSelection();
+    return;
+  }
+
+  // CTRL+V - paste
+  if (e.ctrlKey && e.key === "v") {
+    e.preventDefault();
+    await pasteSelection();
+    return;
+  }
+
+  // Delete - clear selection
+  if (e.key === "Delete" || e.key === "Backspace") {
+    e.preventDefault();
+    await deleteSelection();
+    return;
+  }
+
+  // Enter - commit current transform
+  if (e.key === "Enter") {
+    e.preventDefault();
+    await commitSelection();
+    return;
+  }
+
+  // Escape - cancel selection
+  if (e.key === "Escape") {
+    e.preventDefault();
+    await clearSelection();
+    return;
+  }
+});
+
 
 setActiveTool("brush");
 updateShapeUI();

@@ -54,3 +54,19 @@
 
     applyZoom(1);
 })();
+
+
+async function undo(){
+    await fetch("/api/v1/tools/undo", {
+    method: "POST"
+    });
+
+    location.reload();
+}
+
+async function redo(){
+    await fetch("/api/v1/tools/redo", {
+    method: "POST"
+    });
+    location.reload();
+}

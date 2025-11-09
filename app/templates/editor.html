@@ -97,10 +97,10 @@
   <!-- Left Toolbar -->
   <aside class="toolbar" aria-label="Tools">
     <!-- Selection -->
-    <button data-tool="rectangular" title="Select (Rectangular)">▭</button>
-    <button data-tool="freeform_select" title="Freeform Select">✏️</button>
-    <button data-tool="polygoanl_select" title="Polygonal Select">🔺</button>
-    <button data-tool="magic_lasso" title="Magic Lasso">🪄</button>
+    <button data-tool="select_rect" title="Select Rectangle">▭</button>
+    <button data-tool="select_freeform" title="Select Freeform">✏️</button>
+    <button data-tool="select_polygonal" title="Select Polygonal">🔺</button>
+    <button data-tool="select_magic_lasso" title="Select Magic Lasso">✨</button>
     <hr />
 
     <!-- Brush -->
@@ -175,11 +175,11 @@
           id="filterSelected"
           onchange="changeOptions()"
         >
-          <option value="" selected>-- Choose Filter Type --</option>
-          <option value="hueOption">Hue Shift</option>
+          <option value="" selected>-- Choose filter type --</option>
+          <option value="hueOption">Hue shift</option>
           <option value="grayOption">Grayscale</option>
-          <option value="featureOption">Harris corner Detection</option>
-          <option value="edgeOption">Edge Detection</option>
+          <option value="featureOption">Harris corner detection</option>
+          <option value="edgeOption">Edge detection</option>
           <option value="treshOption">Thresholding</option>
           <option value="blurOption">Gaussian blurring</option>
           <option value="medianOption">Median blurring</option>
@@ -190,6 +190,7 @@
         <!-- Hue -->
         <div class="filter-option" id="hueOption" style="display:none">
           <hr />
+            <br>
           <form onsubmit="hueShift(event)">
             <label for="inpHue">Amount of shift:</label>
             <input type="number" id="inpHue" value="50" required />
@@ -201,6 +202,7 @@
         <div class="filter-option" id="grayOption" style="display:none">
           <hr />
           <p>(Sets alpha channels to 1)</p>
+            <br>
           <form onsubmit="grayscale(event)">
             <input type="submit" value="Apply" />
           </form>
@@ -210,6 +212,7 @@
         <div class="filter-option" id="featureOption" style="display:none">
           <hr />
           <p>(Sets alpha channels to 1)</p>
+            <br>
           <form onsubmit="featureDetection(event)">
             <label for="inpBlockSize">Block size:</label>
             <input type="number" id="inpBlockSize" value="2" required min="1" />
@@ -225,6 +228,7 @@
         <div class="filter-option" id="edgeOption" style="display:none">
           <hr />
           <p>(Sets alpha channels to 1)</p>
+            <br>
           <form onsubmit="edgeDetection(event)">
             <label for="edgeAlg">Algorithm:</label>
             <select class="filter-select" id="edgeAlg">
@@ -240,6 +244,7 @@
         <div class="filter-option" id="treshOption" style="display:none">
           <hr />
           <p>(Sets alpha channels to 1)</p>
+            <br>
           <form onsubmit="thresholding(event)">
             <label for="threshAlg">Algorithm:</label>
             <select class="filter-select" id="threshAlg" onchange="disableThresh()">
@@ -260,6 +265,7 @@
         <!-- Gaussian -->
         <div class="filter-option" id="blurOption" style="display:none">
           <hr />
+            <br>
           <form onsubmit="gaussBlur(event)">
             <label for="inpKSize1">Ksize:</label>
             <div style="display:flex;gap:.5rem;flex-wrap:nowrap">
@@ -277,6 +283,7 @@
         <!-- Median -->
         <div class="filter-option" id="medianOption" style="display:none">
           <hr />
+            <br>
           <form onsubmit="medianBlur(event)">
             <label for="inpMedianKSize">Ksize:</label>
             <input type="number" id="inpMedianKSize" value="5" required min="1" step="2" />
@@ -288,6 +295,7 @@
         <div class="filter-option" id="bilateralOption" style="display:none">
           <hr />
           <p>(Sets alpha channels to 1)</p>
+            <br>
           <form onsubmit="bilateralBlur(event)">
             <label for="inpD">d:</label>
             <input type="number" id="inpD" value="9" required max="10" />
@@ -302,6 +310,7 @@
         <!-- Custom Kernel -->
         <div class="filter-option" id="customOption" style="display:none">
           <hr />
+            <br>
           <label for="nMatrix">Kernel shape:</label>
           <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:nowrap">
             <input type="number" id="nMatrix" value="5" required onchange="createMatrix()" />
@@ -310,6 +319,7 @@
           </div>
           <hr />
           <form class="no-arrow" onsubmit="customKernel(event)">
+              <br>
             <label for="matrixConst">Kernel = Const ⨯ Matrix</label>
             <div style="display:flex;justify-content:center;align-items:center;gap:.25rem;margin:.5rem 0;">
               <span>( 1 ÷</span>
@@ -389,8 +399,8 @@
     </div>
 
     <div class="quick-actions">
-      <button title="Undo">↶</button>
-      <button title="Redo">↷</button>
+      <button title="Undo" onclick="undo()">↶</button>
+      <button title="Redo" onclick="redo()">↷</button>
     </div>
 
     <hr />

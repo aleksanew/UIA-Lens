@@ -48,6 +48,13 @@ button:active {
   transform: translateY(0);
   box-shadow: 0 2px 5px rgba(0,0,0,0.3);
 }
+button:disabled{
+    background-color: gray; !important;
+    color: var(--fg-1); !important;
+    transition: none; !important;
+    transform: none; !important;
+    box-shadow: none; !important;
+}
 
 .center-screen {
   min-height: 100vh;

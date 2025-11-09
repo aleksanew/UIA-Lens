@@ -21,7 +21,7 @@ def _active_png_path(pid:str, idx: int) -> str:
 def _ensure_layer_png(pid, stack, idx):
     layer_path = _active_png_path(pid, idx)
     if not os.path.exists(layer_path):
-        layer = stack.at(idx)
+        layer = stack.get_current_layer()
         arr = layer.get_image()
         if arr is None:
             h, w = stack.shape()
@@ -31,7 +31,6 @@ def _ensure_layer_png(pid, stack, idx):
         elif arr.shape[2] == 3:
             bgra = np.zeros((arr.shape[0], arr.shape[1], 4), dtype=np.uint8)
             bgra[:, :, :3] = arr
-            bgra[:, :, 3] = 255
             arr = bgra
         cv2.imwrite(layer_path, arr)
     return layer_path
@@ -171,15 +170,11 @@ def shape():
     stroke = data.get("stroke", "#000000")
 
     try:
-        stroke_width = int(data.get("strokeWidth", data.get("size", 2)))
+        stroke_width = int(data.get("strokeWidth", 2))
         fill_alpha = int(data.get("fillAlpha", 255))
         stroke_alpha = int(data.get("strokeAlpha", 255))
     except (TypeError, ValueError):
         return jsonify({"error": "Invalid numeric value for stroke/fill alpha/width"}), 400
-
-    stroke_width = max(1, min(256, stroke_width))
-    fill_alpha = max(0, min(255, fill_alpha))
-    stroke_alpha = max(0, min(255, stroke_alpha))
 
     if shape in ("rect", "ellipse", "line"):
         if not (isinstance(start, (list, tuple)) and isinstance(end, (list, tuple)) and len(start) == 2 and len(end) == 2):
@@ -187,6 +182,8 @@ def shape():
     elif shape == "polygon":
         if not (isinstance(points, list) and len(points) >= 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in points)):
             return jsonify({"error": "points must be list of [x, y]"}), 400
+        else:
+            return jsonify({"error": "Invalid shape"}), 400
 
     stack = storage.load_layers()
     idx = stack.selected_layer()
@@ -256,3 +253,19 @@ def text():
         return jsonify({"error": f"Tool '{text}' failed: {e}"}), 500
 
     return _update_and_save(stack, layer_path)
+
+
+@bp.post("/undo")
+def undo():
+    storage.decrement_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
+    return jsonify({"status": "ok"}), 200
+
+
+@bp.post("/redo")
+def redo():
+    storage.increment_active_snapshot()
+    stack = storage.load_layers()
+    storage.redraw_all_images(stack)
+    return jsonify({"status": "ok"}), 200

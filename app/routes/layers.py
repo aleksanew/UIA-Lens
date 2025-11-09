@@ -47,7 +47,7 @@ def update_active():
 def add_layer():
     stack = storage.load_layers()
     stack.create_layer()
-    stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
+    storage.redraw_selected_image(stack)
     storage.save_layers(stack)
     return jsonify({"status": "ok"}), 200
 
@@ -64,7 +64,7 @@ def delete_layer():
 def duplicate_layer():
     stack = storage.load_layers()
     stack.duplicate_selected_layer()
-    stack.create_image_from_selected_layers_at(f"{storage.user_path()}/layers")
+    storage.redraw_selected_image(stack)
     storage.save_layers(stack)
     return jsonify({"status": "ok"}), 200
 
