@@ -156,21 +156,24 @@ def apply_selection():
     new_x = x + dx
     new_y = y + dy
 
-    # Handle "move" operation, start by removing source region
+    # Handle "move" operation, start by removing source region (no save yet)
     if operation == 'move':
         src_image[y:y+h, x:x+w] = cv2.bitwise_and(
             src_image[y:y+h, x:x+w],
             cv2.bitwise_not(mask_4channel)
         )
-        stack = storage.load_layers()
-        layer = stack.get_current_layer()
-        layer.update(src_image)
-        storage.save_layers(stack)
-        #storage.redraw_selected_image(stack)
+
+        # If this is a pure cut (no translation or scaling), persist once and finish
+        if (dx == 0 and dy == 0 and float(scaleX) == 1.0 and float(scaleY) == 1.0):
+            layer = stack.get_current_layer()
+            layer.update(src_image)
+            storage.save_layers(stack)
+            storage.redraw_selected_image(stack)
+            return jsonify({"status": "ok", "action": "cut"}), 200
     
-    stack = storage.load_layers()
-    dst_layer = stack.get_current_layer()
-    dst_image = dst_layer.get_image()
+    # Destination is current layer (same as source in current implementation)
+    dst_layer = src_layer
+    dst_image = src_image
     if dst_image is None:
         return jsonify({"error": f"Failed to load destination layer image at {dst_layer}"}), 500
     
@@ -205,7 +208,6 @@ def apply_selection():
         dst_image[new_y:new_y+paste_h, new_x:new_x+paste_w] = blended
 
     # Save updated destination layer
-    stack = storage.load_layers()
     layer = stack.get_current_layer()
     layer.update(dst_image)
     storage.save_layers(stack)
