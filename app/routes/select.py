@@ -2,7 +2,7 @@
 
 from flask import Blueprint, jsonify, request, session, current_app
 from ..services.imaging import decode_mask, rectangular_select, freeform_select, polygonal_select, magic_lasso_select # actual functions
-from app.services import storage
+from app.services import storage, transform
 import base64
 import numpy as np
 import cv2
@@ -76,7 +76,7 @@ def apply_selection():
     selection = data.get('selection')
 
     stack = storage.load_layers()
-    transform = data.get('transform')
+    trans = data.get('transform')
     src_layer = data.get('src_layer', stack.selected_layer()) #default to current
     dst_layer = data.get('dst_layer', stack.selected_layer())
         
@@ -113,7 +113,26 @@ def apply_selection():
     src_image = src_layer.get_image()
     if src_image is None:
         return jsonify({"error": f"Failed to load source layer image at {src_layer}"}), 500
-    
+
+    if operation == "transform":
+        scale = trans.get('scale', 1.0)
+        rotation_deg = trans.get('rotation', 0)
+
+        src_img = transform.rotate(src_image, mask, int(rotation_deg))
+
+        bgra_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
+        bgra_mask = transform.rotate(bgra_mask, mask, int(rotation_deg))
+        mask = cv2.cvtColor(bgra_mask, cv2.COLOR_BGRA2GRAY)
+
+        src_img = transform.rescale(src_img, mask, float(scale))
+
+        src_layer.update(src_img)
+        storage.save_layers(stack)
+        storage.redraw_selected_image(stack)
+
+        return jsonify({"status": "ok"}), 200
+
+
     if src_image.ndim == 2:
         src_image = cv2.cvtColor(src_image, cv2.COLOR_GRAY2BGRA)
     elif src_image.shape[2] == 3:
@@ -139,10 +158,10 @@ def apply_selection():
     selected_region = cv2.bitwise_and(selected_region, mask_4channel)
 
     # Get transform parameters
-    dx = transform.get('dx', 0)
-    dy = transform.get('dy', 0)
-    scaleX = transform.get('scaleX', 1.0)
-    scaleY = transform.get('scaleY', 1.0)
+    dx = trans.get('dx', 0)
+    dy = trans.get('dy', 0)
+    scaleX = trans.get('scaleX', 1.0)
+    scaleY = trans.get('scaleY', 1.0)
 
     # Apply scaling if needed
     if scaleX != 1.0 or scaleY != 1.0:
