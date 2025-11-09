@@ -29,11 +29,12 @@
         <summary>File</summary>
         <ul>
           <li><a href="#" id="file-new">New</a></li>
-          <li><a href="#" id="file-open-local">Open (from computer)</a></li>
-          <li><a href="#" id="file-open-storage">Open (from storage)</a></li>
+          <li><a href="#" id="file-open-local">Open</a></li>
           <li class="sep"></li>
           <li><a href="#" id="file-save-as">Save As…</a></li>
+          <li><a href="#" id="file-properties">Properties</a></li>
           <li class="sep"></li>
+          <li><a href="/api/v1/files/export?type=png">Export Image (.png)</a></li>
           <li><a href="/api/v1/files/export?type=zip">Export Project (.zip)</a></li>
         </ul>
       </details>
@@ -481,6 +482,8 @@
       <div id="projects-list" class="projects-list" aria-live="polite"></div>
     </section>
   </aside>
+
+  <input type="file" id="file-open-input" hidden />
 
   <!-- Scripts -->
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>

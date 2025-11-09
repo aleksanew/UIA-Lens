@@ -47,13 +47,19 @@
     e.preventDefault();
     inputOpen?.click();
   });
+  function isImageFile(file){
+    if (!file || !file.name) return false;
+    return /\.(png|jpe?g|bmp|tiff?|webp)$/i.test(file.name);
+  }
+
   inputOpen?.addEventListener('change', async () => {
     if (!inputOpen.files || inputOpen.files.length === 0) return;
     const file = inputOpen.files[0];
     const fd = new FormData();
     fd.append('file', file);
+    const url = isImageFile(file) ? '/api/v1/files/import-layer' : '/api/v1/files/open';
     try {
-      const res = await fetch('/api/v1/files/open', { method: 'POST', body: fd });
+      const res = await fetch(url, { method: 'POST', body: fd });
       if (!res.ok) throw new Error(await res.text());
       reloadEditor();
     } catch (err) {
@@ -118,6 +124,36 @@
     }
   });
 
+  const btnProps = $('#file-properties');
+  btnProps?.addEventListener('click', async (e) => {
+    e.preventDefault();
+    try {
+      const data = await getJSON('/api/v1/files/properties');
+      const project = data.project || {};
+      const dims = project.canvas;
+      const layerCount = project.layer_count ?? 'unknown';
+      const sizeBytes = project.file_size_bytes;
+      const pixel = project.pixel_stats;
+      const sizeText = typeof sizeBytes === 'number' ? formatBytes(sizeBytes) : 'unknown';
+      const lines = [
+        `Name: ${project.name || '(unnamed)'}`,
+        `Layers: ${layerCount}`,
+        dims ? `Canvas: ${dims.width} × ${dims.height}px` : 'Canvas: unknown',
+        `Project size: ${sizeText}`,
+      ];
+      if (pixel){
+        lines.push(
+          `Pixel mean (RGBA): ${pixel.mean?.join(', ')}`,
+          `Pixel min (RGBA): ${pixel.min?.join(', ')}`,
+          `Pixel max (RGBA): ${pixel.max?.join(', ')}`
+        );
+      }
+      alert(lines.join('\n'));
+    } catch (err){
+      alert('Properties failed: ' + err.message);
+    }
+  });
+
   // Projects list in editor window
   const listEl = $('#projects-list');
   const refreshBtn = $('#projects-refresh');
@@ -170,4 +206,12 @@
   refreshBtn?.addEventListener('click', (e) => { e.preventDefault(); loadProjects(); });
   // Load on first paint
   if (listEl) loadProjects();
+
+  function formatBytes(bytes){
+    if (typeof bytes !== 'number' || bytes < 0) return 'unknown';
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+    return `${(bytes / Math.pow(1024, i)).toFixed(2)} ${units[i]}`;
+  }
 })();
