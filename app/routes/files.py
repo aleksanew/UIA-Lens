@@ -3,10 +3,13 @@
 from flask import Blueprint, jsonify, request, session, current_app, send_file
 import os, json, io, zipfile, re
 import cv2
+import numpy as np
 from app.models import LayerStack
 from app.services import storage
 
 bp = Blueprint("files", __name__)
+
+IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"}
 
 def _root() -> str:
     return current_app.config.get("STORAGE_ROOT")
@@ -16,6 +19,19 @@ def get_user_path(pid: str):
 
 def get_project_json_path(pid: str):
     return os.path.join(get_user_path(pid), "project.json")
+
+def _load_image_from_upload(file_storage):
+    data = np.frombuffer(file_storage.read(), dtype=np.uint8)
+    if data.size == 0:
+        return None
+    img = cv2.imdecode(data, cv2.IMREAD_UNCHANGED)
+    if img is None:
+        return None
+    if img.ndim == 2:
+        img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGRA)
+    elif img.shape[2] == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
+    return img
 
 @bp.route("/new", methods=["POST"])
 def new_project():
@@ -132,7 +148,7 @@ def open_project():
             if not os.path.exists(os.path.join(user_path, "layers.pickle")):
                 return jsonify({"status": "error", "message": "Imported zip missing layers.pickle"}), 400
 
-        elif ext.lower() in [".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff", ".webp"]:
+        elif ext.lower() in IMAGE_EXTENSIONS:
             # Import an image as a new project: background + image layer
             img = cv2.imread(save_path, cv2.IMREAD_UNCHANGED)
             if img is None:
@@ -276,12 +292,32 @@ def export_project():
             pass
 
     project_name = _safe_filename(meta.get("name"), pid)
+    pickle_path = os.path.join(user_path, "layers.pickle")
 
-    # for later (if needed):
-    # export pickle
-    # export flattened PNG
+    if export_type == "png":
+        stack = storage.load_layers()
+        if stack is None:
+            if not os.path.exists(pickle_path):
+                return jsonify({"error": "Project data missing"}), 400
+            stack = LayerStack.LayerStack(0, 0)
+            if not stack.load_pickle(pickle_path):
+                return jsonify({"error": "Failed to load project state"}), 500
 
-    # export zip package
+        flattened = stack.get_collapsed_stack_as_image()
+        ok, buffer = cv2.imencode(".png", flattened)
+        if not ok:
+            return jsonify({"error": "Failed to encode image"}), 500
+
+        mem = io.BytesIO(buffer.tobytes())
+        mem.seek(0)
+        return send_file(
+            mem,
+            mimetype="image/png",
+            as_attachment=True,
+            download_name=f"{project_name}.png",
+        )
+
+    # Default: export zip package
     mem = io.BytesIO()
     with zipfile.ZipFile(mem, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         # project.json (ensure minimal schema)
@@ -292,7 +328,6 @@ def export_project():
         }))
 
         # include layers.pickle
-        pickle_path = os.path.join(user_path, "layers.pickle")
         if os.path.exists(pickle_path):
             zf.write(pickle_path, arcname="layers.pickle")
 
@@ -303,6 +338,135 @@ def export_project():
                 if name.lower().endswith('.png'):
                     zf.write(os.path.join(layers_dir, name), arcname=os.path.join("layers", name))
 
-    # return zip as downloadable response
     mem.seek(0)
     return send_file(mem, mimetype="application/zip", as_attachment=True, download_name=f"{project_name}.zip")
+
+
+@bp.get("/properties")
+def project_properties():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "No active project"}), 400
+
+    user_path = get_user_path(pid)
+    meta = {"id": pid, "name": pid, "layers": []}
+    meta_path = get_project_json_path(pid)
+    if os.path.exists(meta_path):
+        try:
+            with open(meta_path) as f:
+                loaded = json.load(f)
+                meta["id"] = loaded.get("id") or loaded.get("pid") or pid
+                meta["name"] = loaded.get("name") or pid
+                meta["layers"] = loaded.get("layers", [])
+        except Exception:
+            pass
+
+    stack = storage.load_layers()
+    if stack is None:
+        pickle_path = os.path.join(get_user_path(pid), "layers.pickle")
+        if os.path.exists(pickle_path):
+            stack = LayerStack.LayerStack(0, 0)
+            try:
+                if not stack.load_pickle(pickle_path):
+                    stack = None
+            except Exception:
+                stack = None
+
+    total_size = 0
+    def _safe_size(path: str) -> int:
+        try:
+            return os.path.getsize(path)
+        except OSError:
+            return 0
+
+    total_size += _safe_size(meta_path)
+    total_size += _safe_size(os.path.join(user_path, "layers.pickle"))
+
+    layers_dir = os.path.join(user_path, "layers")
+    if os.path.isdir(layers_dir):
+        for name in os.listdir(layers_dir):
+            if name.lower().endswith(".png"):
+                total_size += _safe_size(os.path.join(layers_dir, name))
+
+    props = {
+        "name": meta.get("name", pid),
+        "layer_count": len(meta.get("layers", [])),
+        "canvas": None,
+        "file_size_bytes": total_size,
+        "pixel_stats": None,
+    }
+
+    pixel_stats = None
+    if stack:
+        height, width = stack.shape()
+        props["canvas"] = {"width": width, "height": height}
+        props["layer_count"] = stack.size()
+
+        flattened = stack.get_collapsed_stack_as_image()
+        if flattened is not None and flattened.size:
+            # BGRA -> RGBA for presentation
+            rgba = flattened[:, :, [2, 1, 0, 3]]
+            means = np.mean(rgba, axis=(0, 1))
+            mins = np.min(rgba, axis=(0, 1))
+            maxs = np.max(rgba, axis=(0, 1))
+            pixel_stats = {
+                "mean": [round(float(v), 2) for v in means],
+                "min": [int(v) for v in mins],
+                "max": [int(v) for v in maxs],
+                "channels": ["R", "G", "B", "A"],
+            }
+
+    props["pixel_stats"] = pixel_stats
+
+    return jsonify({"status": "success", "project": props})
+
+
+@bp.post("/import-layer")
+def import_layer():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "No active project"}), 400
+
+    uploaded_file = request.files.get("file")
+    if not uploaded_file or uploaded_file.filename == "":
+        return jsonify({"error": "No file uploaded"}), 400
+
+    _, ext = os.path.splitext(uploaded_file.filename)
+    ext = (ext or "").lower()
+    if ext not in IMAGE_EXTENSIONS:
+        return jsonify({"error": f"Unsupported image type '{ext}'"}), 400
+
+    stack = storage.load_layers()
+    if stack is None:
+        pickle_path = os.path.join(get_user_path(pid), "layers.pickle")
+        stack = LayerStack.LayerStack(0, 0)
+        if not (os.path.exists(pickle_path) and stack.load_pickle(pickle_path)):
+            return jsonify({"error": "Failed to load current project"}), 500
+
+    img = _load_image_from_upload(uploaded_file)
+    if img is None:
+        return jsonify({"error": "Failed to read uploaded image"}), 400
+
+    height, width = stack.shape()
+    if height <= 0 or width <= 0:
+        height, width = img.shape[:2]
+    if img.shape[0] != height or img.shape[1] != width:
+        img = cv2.resize(img, (width, height), interpolation=cv2.INTER_AREA if img.shape[0] > height or img.shape[1] > width else cv2.INTER_LINEAR)
+
+    stack.create_layer()
+    layer = stack.get_current_layer()
+    layer.update(img)
+    layer_name = os.path.splitext(uploaded_file.filename)[0] or layer.name()
+    layer.rename(layer_name)
+
+    storage.redraw_selected_image(stack)
+    storage.save_layers(stack)
+
+    return jsonify({
+        "status": "success",
+        "message": f"Layer '{layer_name}' added",
+        "layer": {
+            "name": layer_name,
+            "index": stack.selected_layer()
+        }
+    })

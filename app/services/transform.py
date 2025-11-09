@@ -4,8 +4,10 @@ import numpy as np
 
 
 
-def rotate(img, mask, deg):
-    deg = deg % 360 # Ensure in bounds
+def rotate(img, mask, deg:int):
+    if deg>360:
+        deg=0
+
     deg = 360 - deg # Makes rotation clockwise
 
     center = _find_center(mask)
@@ -16,7 +18,7 @@ def rotate(img, mask, deg):
     return img
 
 
-def rescale(img, mask, scale):
+def rescale(img, mask, scale:float):
     center = _find_center(mask)
     back = _blank_out(img, mask)
     fore = _extract(img, mask)

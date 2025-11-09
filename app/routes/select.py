@@ -132,7 +132,25 @@ def apply_selection():
     src_image = src_layer.get_image()
     if src_image is None:
         return jsonify({"error": f"Failed to load source layer image at {src_layer}"}), 500
-    
+
+    if operation == "transform":
+        scale = transform.get('scale', 1.0)
+        rotation_deg = transform.get('rotation', 0)
+
+        src_img = transform.rotate(src_image, mask, int(rotation_deg))
+
+        bgra_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
+        bgra_mask = transform.rotate(bgra_mask, mask, int(rotation_deg))
+        mask = cv2.cvtColor(bgra_mask, cv2.COLOR_BGRA2GRAY)
+
+        src_img = transform.rescale(src_img, mask, float(scale))
+
+        src_layer.update(src_img)
+        storage.save_layers(stack)
+        storage.redraw_selected_image(stack)
+
+        return jsonify({"status": "ok"}), 200
+
     if src_image.ndim == 2:
         src_image = cv2.cvtColor(src_image, cv2.COLOR_GRAY2BGRA)
     elif src_image.shape[2] == 3:
@@ -175,7 +193,7 @@ def apply_selection():
     new_x = x + dx
     new_y = y + dy
 
-    # Handle "move" operation, start by removing source region (no save yet)
+    # Handle "move" operation, start by removing source region
     if operation == 'move':
         src_image[y:y+h, x:x+w] = cv2.bitwise_and(
             src_image[y:y+h, x:x+w],
@@ -227,6 +245,7 @@ def apply_selection():
         dst_image[new_y:new_y+paste_h, new_x:new_x+paste_w] = blended
 
     # Save updated destination layer
+    stack = storage.load_layers()
     layer = stack.get_current_layer()
     layer.update(dst_image)
     storage.save_layers(stack)

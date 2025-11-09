@@ -2,7 +2,8 @@
 import os
 
 import numpy as np
-from flask import Blueprint, current_app, jsonify, render_template, session, redirect, url_for, send_from_directory
+from flask import Blueprint, current_app, jsonify, render_template, session, redirect, url_for, send_from_directory, \
+    request
 
 from app.models import LayerStack
 from app.services import storage
@@ -46,11 +47,15 @@ def layer_img(filename):
 
 # Create user storage, create empty canvas, add bg and l1,
 # export images to user storage, save canvas in user storage
-@bp.get("/open_new_project")
+@bp.post("/open_new_project")
 def open_new_project():
+    data = request.get_json()
+    h = data.get("height", 500)
+    w = data.get("width", 500)
+
     storage.init_session()
-    # TODO: layer size based on user input
-    stack = LayerStack.LayerStack(500, 500)
+
+    stack = LayerStack.LayerStack(int(h), int(w))
     stack.add_base_layers()
     storage.redraw_all_images(stack)
     storage.save_layers(stack)

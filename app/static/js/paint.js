@@ -60,11 +60,14 @@ state.selection = {
     dx: 0,            // Offset from original position
     dy: 0,
     scaleX: 1.0,
-    scaleY: 1.0
+    scaleY: 1.0,
+    scale: 1.0,
+    rotation: 0
   },
   isDragging: false,
   dragStart: null,
   isPasted: false,
+  isTransformed: false,
 };
 
 function setupCanvas() {
@@ -405,6 +408,11 @@ function reloadImage() {
   imgEl.addEventListener("load", function onload() {
     imgEl.removeEventListener("load", onload);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // Redraw selection if active
+    if (state.selection.active) {
+      drawSelectionMask();
+    }
   });
   imgEl.src = `${base}?t=${Date.now()}`;
 }
@@ -596,8 +604,9 @@ function drawSelectionPreview() {
     ctx.fillRect(x + w - handleSize/2, y - handleSize/2, handleSize, handleSize);
     ctx.fillRect(x - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
     ctx.fillRect(x + w - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
-    
+
     ctx.restore();
+    showTransformOptions();
   }
   
   // Also handle preview while drawing (before committed)
@@ -766,6 +775,7 @@ function clearSelection() {
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
   state.selection.preview = { start: null, current: null, points: [] };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hideTransformOptions();
 }
 
 function buildSelectionPayload(sel) {
@@ -780,9 +790,6 @@ function buildSelectionPayload(sel) {
     case "polygonal":
       payload.vertices = sel.vertices;
       break;
-    case "magic-lasso":
-      payload.seed_points = sel.seed_points;
-      break;
     case "magnetic":
       // Prefer sending finalized vertices if available; otherwise send raw_clicks
       if (sel.vertices && sel.vertices.length) payload.vertices = sel.vertices;
@@ -791,6 +798,48 @@ function buildSelectionPayload(sel) {
   }
   return payload;
 }
+
+function showTransformOptions(){
+    let div = document.getElementById("selectionInputOverlay");
+    div.style.display = "block";
+}
+function hideTransformOptions(){
+    let div = document.getElementById("selectionInputOverlay");
+    div.style.display = "none";
+}
+
+const scaleSlider = document.getElementById("transform-scale");
+const scaleLabel = document.getElementById("label-transform-scale");
+const rotateSlider = document.getElementById("transform-rotation");
+const rotateLabel = document.getElementById("label-transform-rotation");
+const transformActive = document.getElementById("label-transform-active")
+
+scaleSlider.addEventListener("input", () => {
+  scaleLabel.textContent = "Resize: " + scaleSlider.value + "x";
+  state.selection.transform.scale = scaleSlider.value;
+  state.selection.active = true;
+  state.selection.isTransformed = true;
+
+  if (state.selection.isCut || state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    transformActive.textContent = "Transforming Inactive"
+  } else {
+      transformActive.textContent = "Transforming Active"
+  }
+
+});
+
+rotateSlider.addEventListener("input", () => {
+  rotateLabel.textContent = "Rotate: " + rotateSlider.value + "°";
+  state.selection.transform.rotation = rotateSlider.value;
+  state.selection.active = true;
+  state.selection.isTransformed = true;
+
+  if (state.selection.isCut || state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    transformActive.textContent = "Transforming Inactive"
+  } else {
+      transformActive.textContent = "Transforming Active"
+  }
+});
 
 async function postJSON(url, payload) {
   const res = await fetch(url, {
@@ -1004,11 +1053,10 @@ async function commitSelection() {
     operation = state.selection.pasteFromCut ? "move" : "copy";
   } else if (state.selection.isCut) {
     operation = "move";
-  } else if (state.selection.transform.dx !== 0 ||
-    state.selection.transform.dy !== 0 ||
-    state.selection.transform.scaleX !== 1.0 ||
-    state.selection.transform.scaleY !== 1.0) { 
+  } else if (state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
     operation = "move";
+  } else if (state.selection.isTransformed){
+    operation = "transform"
   } else {
     clearSelection();
     return; // No operation to commit
@@ -1450,6 +1498,7 @@ canvas.addEventListener("pointermove", (e) => {
 
   // Dragging active selection
   if (state.selection.isDragging && state.selection.dragStart && state.selection.initialTransform) {
+    transformActive.textContent = "Transforming Inactive"
     const [mouseX, mouseY] = getCanvasXY(e);
     const dragDx = mouseX - state.selection.dragStart.x;
     const dragDy = mouseY - state.selection.dragStart.y;
