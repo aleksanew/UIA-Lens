@@ -95,12 +95,12 @@
 async function redirectNew(){
     let w = prompt("Canvas width in pixels");
     let h = prompt("Canvas height in pixels")
-    let pw = parseInt(w)
-    let ph = parseInt(h)
-    if (p != pw || pw < 1){
+    let parsed_w = parseInt(w)
+    let parsed_h = parseInt(h)
+    if (w != parsed_w || parsed_w < 1){
         w = 500;
     }
-    if (h != ph || ph < 1){
+    if (h != parsed_h || parsed_h < 1){
         h = 500
     }
     let res = await fetch("/api/v1/open_new_project", {
@@ -111,5 +111,6 @@ async function redirectNew(){
           height: parseInt(h)
       })
     });
+    console.log(res.url)
     window.location.replace(res.url);
 }

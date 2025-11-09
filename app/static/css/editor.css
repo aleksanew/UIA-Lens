@@ -537,7 +537,7 @@
 
 .selection-input-overlay{
     display: none;
-    margin-left: 5rem;
+    margin-top: -35rem;
     border-radius: 3px;
     box-shadow: 10px 10px black;
     background: var(--bg-2);
