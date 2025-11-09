@@ -733,6 +733,25 @@ function clearSelection() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
+function buildSelectionPayload(sel) {
+  const payload = { type: sel.type };
+  switch (sel.type) {
+    case "rect":
+      payload.coords = sel.coords;
+      break;
+    case "freeform":
+      payload.path = sel.path;
+      break;
+    case "polygonal":
+      payload.vertices = sel.vertices;
+      break;
+    case "magic-lasso":
+      payload.seed_points = sel.seed_points;
+      break;
+  }
+  return payload;
+}
+
 async function postJSON(url, payload) {
   const res = await fetch(url, {
     method: "POST",
@@ -825,18 +844,8 @@ async function sendPickColor(x, y) {
 
 async function fetchSelectionMask() {
   if (!state.selection.active) return;
-  
-  const payload = { image_id: "current"};
 
-  if (state.selection.type === "rect") {
-    payload.coords = state.selection.coords;
-  } else if (state.selection.type === "freeform") {
-    payload.path = state.selection.path;
-  } else if (state.selection.type === "polygonal") {
-    payload.vertices = state.selection.vertices;
-  } else if (state.selection.type === "magic-lasso") {
-    payload.seed_points = state.selection.seed_points;
-  }
+  const payload = { image_id: "current", ...buildSelectionPayload(state.selection) };
 
   try {
     const res = await fetch(`/api/v1/select/${state.selection.type}`, {
@@ -935,16 +944,7 @@ async function commitSelection() {
     return; // No operation to commit
   }
 
-  const selectionData = { type: state.selection.type };
-  if (state.selection.type === "rect") {
-    selectionData.coords = state.selection.coords;
-  } else if (state.selection.type === "freeform") {
-    selectionData.path = state.selection.path;
-  } else if (state.selection.type === "polygonal") {
-    selectionData.vertices = state.selection.vertices;
-  } else if (state.selection.type === "magic-lasso") {
-    selectionData.seed_points = state.selection.seed_points;
-  }
+  const selectionData = buildSelectionPayload(state.selection);
   
   try {
     const res = await fetch("/api/v1/select/apply", {
@@ -972,15 +972,7 @@ async function commitSelection() {
 async function deleteSelection() {
   if (!state.selection.active) return;
 
-  const selectionData = {
-    type: state.selection.type,
-  };
-
-  if (state.selection.type === "rect") {
-    selectionData.coords = state.selection.coords;
-  } else if (state.selection.type === "freeform") {
-    selectionData.path = state.selection.path;
-  }
+  const selectionData = buildSelectionPayload(state.selection);
 
   try {
     const res = await fetch("/api/v1/select/delete", {
