@@ -1,7 +1,7 @@
 # Endpoints for selection operations.
 
 from flask import Blueprint, jsonify, request, session, current_app
-from ..services.imaging import decode_mask, rectangular_select, freeform_select, polygonal_select, magic_lasso_select # actual functions
+from ..services.imaging import decode_mask, rectangular_select, freeform_select, polygonal_select
 from app.services import storage
 import base64
 import numpy as np
@@ -49,20 +49,27 @@ def polygonal():
         return jsonify({"mask": mask_data}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@bp.post("/magnetic")
+def magnetic():
+    pid = session.get("pid")
+    if not pid:
+        return jsonify({"error": "Not logged in / missing pid"}), 401
 
-# Currently not very magic and more just bad, plan to improve it.
-# Uses seed points to try to snap to edges using Canny, but it's bad.
-@bp.post("/magic-lasso")
-def magic_lasso():
     data = request.get_json()
-    if not data or 'image_id' not in data or 'seed_points' not in data:
-        return jsonify({"error": "Missing image_id or seed_points (list of [x,y] for path snapping)"}), 400
+    raw_clicks = data.get("raw_clicks")
+    if not isinstance(raw_clicks, list) or len(raw_clicks) < 3:
+        return jsonify({"error": "raw_clicks must be a list of at least 3 [x,y] points"}), 400
+    
     try:
-        mask_data = magic_lasso_select(data['image_id'], data['seed_points'])
-        return jsonify({"mask": mask_data}), 200
+        from ..services.imaging import magnetic_finalize
+        path, mask_b64, modes = magnetic_finalize(pid, raw_clicks)
+        return jsonify({"mask": mask_b64,
+                        "path": path,
+                        "segment_modes": modes}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
-    
+
 @bp.post("/apply")
 def apply_selection():
     pid = session.get("pid")
@@ -95,10 +102,22 @@ def apply_selection():
             if 'vertices' not in selection:
                 return jsonify({"error": "Missing vertices for polygonal selection"}), 400
             mask_base64 = polygonal_select(pid, selection['vertices'])
-        elif selection_type == 'magic-lasso':
-            if 'seed_points' not in selection:
-                return jsonify({"error": "Missing seed_points for magic lasso selection"}), 400
-            mask_base64 = magic_lasso_select(pid, selection['seed_points'])
+        elif selection_type == 'magnetic':
+            # Accept either finalized vertices or raw_clicks produced by the magnetic tool.
+            # If vertices are present (frontend finalized), reuse polygonal_select for mask.
+            if 'vertices' in selection:
+                mask_base64 = polygonal_select(pid, selection['vertices'])
+            elif 'raw_clicks' in selection:
+                try:
+                    from ..services.imaging import magnetic_finalize
+                    path, mask_b64, modes = magnetic_finalize(pid, selection['raw_clicks'])
+                    mask_base64 = mask_b64
+                    # Optionally update selection vertices in-place (not persisted across request)
+                    selection['vertices'] = path
+                except Exception:
+                    raise
+            else:
+                return jsonify({"error": "Missing vertices or raw_clicks for magnetic selection"}), 400
         else:
             return jsonify({"error": "Invalid selection type"}), 400
     except Exception as e:
@@ -242,8 +261,16 @@ def delete_selection():
             mask_base64 = freeform_select(pid, selection['path'])
         elif sel_type == 'polygonal':
             mask_base64 = polygonal_select(pid, selection['vertices'])
-        elif sel_type == 'magic-lasso':
-            mask_base64 = magic_lasso_select(pid, selection['seed_points'])
+        elif sel_type == 'magnetic':
+            # Accept either finalized vertices or raw_clicks
+            if 'vertices' in selection:
+                mask_base64 = polygonal_select(pid, selection['vertices'])
+            elif 'raw_clicks' in selection:
+                from ..services.imaging import magnetic_finalize
+                path, mask_b64, modes = magnetic_finalize(pid, selection['raw_clicks'])
+                mask_base64 = mask_b64
+            else:
+                return jsonify({"error": f"Missing vertices or raw_clicks for magnetic selection"}), 400
         else:
             return jsonify({"error": f"Unknown selection type: {sel_type}"}), 400
     except Exception as e:

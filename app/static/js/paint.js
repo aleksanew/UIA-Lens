@@ -45,11 +45,11 @@ const currentSize = () => (state.tool === "eraser" ? state.eraserSize : state.br
 
 state.selection = {
   active: false,      // Whether an active selection exists
-  type: null,         // 'rect', 'freeform', 'polygonal', 'magic-lasso'
+  type: null,         // 'rect', 'freeform', 'polygonal', 'magnetic'
   coords: null,       // For rect selection: [x1, y1, x2, y2]
   path: null,         // For freeform [[x1,y1], [x2,y2], ...] makes it easier to not combine these two i think
   vertices: null,     // For polygonal [[x1,y1], [x2,y2], ...]
-  seed_points: null,  // For magic lasso
+  raw_clicks: null,   // For magnetic lasso: [[x1,y1], [x2,y2], ...] raw user clicks before server processing
   mask: null,         // Base64 mask from server (optional)
   preview: {
     start: null,      // Starting point for rect selection
@@ -405,11 +405,6 @@ function reloadImage() {
   imgEl.addEventListener("load", function onload() {
     imgEl.removeEventListener("load", onload);
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Redraw selection if active
-    if (state.selection.active) {
-      drawSelectionMask();
-    }
   });
   imgEl.src = `${base}?t=${Date.now()}`;
 }
@@ -689,6 +684,29 @@ function drawSelectionPreview() {
     ctx.restore();
   }
 
+  // Draw finalized magnetic selection even if current active tool is still 'select_magnetic'
+  if (state.selection.type === "magnetic" && state.selection.active && state.selection.vertices && state.tool !== "select_polygonal") {
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    const verts = state.selection.vertices;
+    if (verts.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(verts[0][0] + dx, verts[0][1] + dy);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i][0] + dx, verts[i][1] + dy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
   // Preview when drawing polygonal (only while collecting vertices)
   if (state.tool === "select_polygonal" && state.drawing && state.selection.preview.points.length > 0) {
     const pts = state.selection.preview.points;
@@ -708,12 +726,30 @@ function drawSelectionPreview() {
     ctx.stroke();
     ctx.restore();
   }
-}
 
-function drawSelectionMask() {
-  // Add logic to draw later
+  // preview for magnetic
+  if (state.tool === "select_magnetic" && state.selection.preview.points.length > 0) {
+    const pts = state.selection.preview.points;
+    ctx.save();
 
-  console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
+    // distinct line to highlight its not the final form
+    ctx.strokeStyle = "#ffaa00";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffaa00";
+    for (const pt of pts) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
 }
 
 function clearSelection() {
@@ -721,7 +757,6 @@ function clearSelection() {
   state.selection.coords = null;
   state.selection.path = null;
   state.selection.vertices = null;
-  state.selection.seed_points = null;
   state.selection.mask = null;
 
   state.selection.isPasted = false;
@@ -747,6 +782,11 @@ function buildSelectionPayload(sel) {
       break;
     case "magic-lasso":
       payload.seed_points = sel.seed_points;
+      break;
+    case "magnetic":
+      // Prefer sending finalized vertices if available; otherwise send raw_clicks
+      if (sel.vertices && sel.vertices.length) payload.vertices = sel.vertices;
+      else if (sel.raw_clicks && sel.raw_clicks.length) payload.raw_clicks = sel.raw_clicks;
       break;
   }
   return payload;
@@ -862,11 +902,44 @@ async function fetchSelectionMask() {
     const data = await res.json();
     state.selection.mask = data.mask; // base64 mask
 
-    drawSelectionMask();
   } catch (err) {
     console.error("Selection fetch error:", err);
   }
 }
+
+async function finalizeMagneticSelection() {
+  if (!state.selection.raw_clicks || state.selection.raw_clicks.length < 3) return;
+
+  // make consitent with backend
+  const payload = {
+    image_id: "current",
+    raw_clicks: state.selection.raw_clicks,
+  };
+
+  try {
+    // POST using helper
+    const res = await postJSON("/api/v1/select/magnetic", payload);
+    if (!res) throw new Error("Empty response from magnetic finalize");
+
+    // Server should return { path: [[x,y],...], mask: <base64>, segment_modes?: [...] }
+    state.selection.vertices = res.path || [];
+    state.selection.mask = res.mask || null;
+
+  // Keep selection type as 'magnetic' so the UI/tool doesn't change unexpectedly.
+  // Server now accepts 'magnetic' in apply/delete, so we don't force a tool switch here.
+  state.selection.type = "magnetic";
+    state.selection.active = true;
+    state.drawing = false;
+    state.selection.raw_clicks = null;
+    state.selection.preview.points = [];
+
+    // render the beauty
+    drawSelectionPreview();
+  } catch (err) {
+    console.error("Magnetic finalize error:", err);
+  }
+}
+
 
 async function copySelection() {
   if (!state.selection.active) return;
@@ -881,7 +954,6 @@ async function copySelection() {
     coords: state.selection.coords ? [...state.selection.coords] : null,
     path: state.selection.path ? state.selection.path.map(pt => [...pt]) : null,
     vertices: state.selection.vertices ? state.selection.vertices.map(pt => [...pt]) : null,
-    seed_points: state.selection.seed_points ? state.selection.seed_points.map(pt => [...pt]) : null
   };
 }
 
@@ -896,7 +968,6 @@ async function cutSelection() {
     coords: state.selection.coords ? [...state.selection.coords] : null,
     path: state.selection.path ? state.selection.path.map(pt => [...pt]) : null,
     vertices: state.selection.vertices ? state.selection.vertices.map(pt => [...pt]) : null,
-    seed_points: state.selection.seed_points ? state.selection.seed_points.map(pt => [...pt]) : null
   };
 
   // Visual feedback that its cut so dim area or those fancy edges stuff like that
@@ -911,7 +982,6 @@ async function pasteSelection() {
   state.selection.coords = clip.coords ? [...clip.coords] : null;
   state.selection.path = clip.path ? clip.path.map(pt => [...pt]) : null;
   state.selection.vertices = clip.vertices ? clip.vertices.map(pt => [...pt]) : null;
-  state.selection.seed_points = clip.seed_points ? clip.seed_points.map(pt => [...pt]) : null;
   state.selection.type = clip.type;
 
   state.selection.active = true;
@@ -1120,9 +1190,12 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  if (tool === "select_magic_lasso") {
-    setActiveTool("select_magic_lasso");
-    state.selection.type = "magic-lasso";
+  if (tool === "select_magnetic") {
+    setActiveTool("select_magnetic");
+    state.selection.type = "magnetic";
+    // Ensure preview storage empty
+    state.selection.raw_clicks = [];
+    state.selection.preview.points = [];
     return;
   }
 
@@ -1286,6 +1359,22 @@ canvas.addEventListener("pointerdown", async (e) => {
       return;
     }
   }
+
+  if (state.tool === "select_magnetic") {
+
+  // collect raw clicks for magnetic selection preview
+  const [x, y] = getCanvasXY(e);
+  state.selection.raw_clicks = state.selection.raw_clicks || [];
+  state.selection.raw_clicks.push([x, y]);
+
+  // Use preview.points as existing preview drawing code expects {x,y}
+  state.selection.preview.points = state.selection.raw_clicks.map(([px, py]) => ({ x: px, y: py }));
+
+  // Ensure drawing mode
+  state.drawing = true;
+  drawSelectionPreview(); // reuse the existing preview draw
+  return;
+}
 
   if (state.tool === "select_rect") {
     // Clear previous selection
@@ -1460,6 +1549,14 @@ canvas.addEventListener("pointerup", async (e) => {
     return;
   }
 
+  // Short-circuit pointerup for magnetic tool so we don't trigger stroke/send behavior
+  if (state.tool === "select_magnetic") {
+    // keep preview points intact until user finalizes with Enter
+    state.drawing = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    return;
+  }
+
   if (state.tool === "select_rect") {
     const [x, y] = getCanvasXY(e);
     const start = state.selection.preview.start;
@@ -1553,6 +1650,34 @@ document.addEventListener("keydown", async (e) => {
       state.selection.preview.current = null;
       state.selection.preview.points = [];
       await fetchSelectionMask();
+      drawSelectionPreview();
+      return;
+    }
+  }
+
+  // Special-case: allow finalizing magnetic selection and undo even after pointerup
+  if (state.tool === "select_magnetic" && state.selection.raw_clicks) {
+    if (e.key === "Enter" && state.selection.raw_clicks.length >= 3) {
+      e.preventDefault();
+      await finalizeMagneticSelection();
+      return;
+    }
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      // delete last point
+      if (state.selection.raw_clicks && state.selection.raw_clicks.length > 0) {
+        state.selection.raw_clicks.pop();
+        state.selection.preview.points = state.selection.raw_clicks.map(([x, y]) => ({ x, y }));
+        drawSelectionPreview();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      // allow user to cancel the raw-click preview with Escape
+      e.preventDefault();
+      state.selection.raw_clicks = [];
+      state.selection.preview.points = [];
+      state.drawing = false;
       drawSelectionPreview();
       return;
     }
