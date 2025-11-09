@@ -24,12 +24,60 @@ def _p(root, pid) -> Path:
     (p / "layer_snapshot").mkdir(parents=True, exist_ok=True)
     return p
 
+def _snapshot_dir(pid: str) -> Path:
+    path = Path(_root()) / pid / "layer_snapshot"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+def _legacy_pickle_path(pid: str) -> Path:
+    return Path(_root()) / pid / "layers.pickle"
+
+def _snapshot_refs(pid: str) -> list[int]:
+    refs: list[int] = []
+    for candidate in _snapshot_dir(pid).glob("layers*.pickle"):
+        suffix = candidate.stem.replace("layers", "", 1)
+        if suffix.isdigit():
+            refs.append(int(suffix))
+    refs.sort()
+    return refs
+
+def _set_snapshot_session(pid: str, queue: list[int], snap_index: int, change_number: int) -> None:
+    session["snapshot_pid"] = pid
+    session["snapshot_queue"] = queue
+    session["snapshot_index"] = snap_index
+    session["change_number"] = change_number
+
+def _ensure_snapshot_session(pid: str, *, force: bool = False) -> None:
+    needs_reset = (
+        force
+        or session.get("snapshot_pid") != pid
+        or "snapshot_queue" not in session
+        or "snapshot_index" not in session
+        or "change_number" not in session
+    )
+    if not needs_reset:
+        return
+
+    snapshot_dir = _snapshot_dir(pid)
+    refs = _snapshot_refs(pid)
+    if refs:
+        _set_snapshot_session(pid, refs, len(refs) - 1, refs[-1])
+        return
+
+    legacy = _legacy_pickle_path(pid)
+    if legacy.exists():
+        target = snapshot_dir / "layers0.pickle"
+        if not target.exists():
+            shutil.copy2(legacy, target)
+        _set_snapshot_session(pid, [0], 0, 0)
+        return
+
+    _set_snapshot_session(pid, [], -1, -1)
+
 def init_session():
     pid = new_project(current_app.config.get("STORAGE_ROOT"), "new project")
     session["pid"] = pid
-    session["snapshot_index"] = -1 # Index to "snapshot_queue". Tells which file is current canvas
-    session["change_number"] = -1 # Number used in filename. layers{}.pickle
-    session["snapshot_queue"] = [] # List of "change_number". Ref to specific file for undo/redo
+    _set_snapshot_session(pid, [], -1, -1) # Prepare undo/redo session state
 
 def new_project(root: str, name: str) -> str:
     pid = _pid()
@@ -90,29 +138,64 @@ def _trim_queue(pid, snap_i, queue) -> tuple[int, list]:
     return snap_i, queue
 
 def load_layers() -> LayerStack.LayerStack | None:
-    pid = session["pid"]
-    snap_i = session["snapshot_index"]
-    queue = session["snapshot_queue"]
-    pickle_ref = queue[snap_i]
+    pid = session.get("pid")
+    if not pid:
+        return None
+
+    _ensure_snapshot_session(pid)
+
+    snap_i = session.get("snapshot_index", -1)
+    queue = session.get("snapshot_queue") or []
+    snapshot_path = None
+
+    if queue and 0 <= snap_i < len(queue):
+        ref = queue[snap_i]
+        candidate = _snapshot_dir(pid) / f"layers{ref}.pickle"
+        if candidate.exists():
+            snapshot_path = candidate
+        else:
+            # Snapshot metadata is stale; rebuild from disk and try again.
+            _ensure_snapshot_session(pid, force=True)
+            queue = session.get("snapshot_queue") or []
+            snap_i = session.get("snapshot_index", -1)
+            if queue and 0 <= snap_i < len(queue):
+                ref = queue[snap_i]
+                candidate = _snapshot_dir(pid) / f"layers{ref}.pickle"
+                if candidate.exists():
+                    snapshot_path = candidate
 
     stack = LayerStack.LayerStack(0, 0)
-    if stack.load_pickle(f"{_root()}/{pid}/layer_snapshot/layers{pickle_ref}.pickle"):
+
+    if snapshot_path and stack.load_pickle(str(snapshot_path)):
         return stack
-    else:
-        return None
+
+    legacy_path = _legacy_pickle_path(pid)
+    if legacy_path.exists() and stack.load_pickle(str(legacy_path)):
+        return stack
+
+    return None
 
 def save_layers(stack: LayerStack.LayerStack) -> bool:
     # Save new copy of canvas in users storage
-    pid = session["pid"]
-    current_snap_index = session["snapshot_index"]
-    current_change_number = session["change_number"]
+    pid = session.get("pid")
+    if not pid:
+        return False
+
+    _ensure_snapshot_session(pid)
+
+    current_snap_index = session.get("snapshot_index", -1)
+    current_change_number = session.get("change_number", -1)
 
     new_snap_index = current_snap_index + 1
     new_change_number = current_change_number + 1
 
-    queue = session["snapshot_queue"]
+    queue = list(session.get("snapshot_queue") or [])
 
-    if stack.save_pickle(f"{_root()}/{pid}/layer_snapshot/layers{new_change_number}.pickle"):
+    snapshot_path = _snapshot_dir(pid) / f"layers{new_change_number}.pickle"
+
+    if stack.save_pickle(str(snapshot_path)):
+        canonical_pickle = Path(_root()) / pid / "layers.pickle"
+        stack.save_pickle(str(canonical_pickle))
         # Update which canvas is current (regards to undo/redo)
 
         current_snap_index = new_snap_index
@@ -124,6 +207,7 @@ def save_layers(stack: LayerStack.LayerStack) -> bool:
         session["snapshot_index"] = current_snap_index
         session["change_number"] = current_change_number
         session["snapshot_queue"] = queue
+        session["snapshot_pid"] = pid
         return True
     else:
         return False
