@@ -110,6 +110,7 @@
 }
 
 .canvas-area {
+    margin-top: -20rem; /* Adjust for strange offset */
   grid-area: canvas;
   display: flex;
   align-items: center;
@@ -510,4 +511,19 @@
   background: var(--bg-1);
   border: 1px solid var(--ui-1);
   color: var(--fg-1);
+}
+
+.selection-input-overlay{
+    display: none;
+    margin-left: 5rem;
+    border-radius: 3px;
+    box-shadow: 10px 10px black;
+    background: var(--bg-2);
+}
+.selection-input-overlay input[type="number"]{
+    width: 4rem;
+}
+.selection-input-overlay button{
+    /*text-size-adjust: 50%;*/
+    /*width: 7rem;*/
 }

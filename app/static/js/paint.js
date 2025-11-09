@@ -60,11 +60,14 @@ state.selection = {
     dx: 0,            // Offset from original position
     dy: 0,
     scaleX: 1.0,
-    scaleY: 1.0
+    scaleY: 1.0,
+    scale: 1.0,
+    rotation: 0
   },
   isDragging: false,
   dragStart: null,
   isPasted: false,
+  isTransformed: false,
 };
 
 function setupCanvas() {
@@ -568,18 +571,19 @@ function drawSelectionPreview() {
     const [x1, y1, x2, y2] = state.selection.coords;
     const dx = state.selection.transform.dx;
     const dy = state.selection.transform.dy;
-    
+
+
     const x = x1 + dx;
     const y = y1 + dy;
     const w = x2 - x1;
     const h = y2 - y1;
-    
+
     ctx.save();
     ctx.strokeStyle = "#00aaff";  // Blue selection outline
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);      // Dashed line
     ctx.strokeRect(x, y, w, h);
-    
+
     // Draw corner handles for visual feedback
     const handleSize = 6;
     ctx.fillStyle = "#00aaff";
@@ -587,8 +591,9 @@ function drawSelectionPreview() {
     ctx.fillRect(x + w - handleSize/2, y - handleSize/2, handleSize, handleSize);
     ctx.fillRect(x - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
     ctx.fillRect(x + w - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
-    
+
     ctx.restore();
+    showTransformOptions();
   }
   
   // Also handle preview while drawing (before committed)
@@ -616,6 +621,7 @@ function drawSelectionMask() {
   console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
 }
 
+
 function clearSelection() {
   state.selection.active = false;
   state.selection.coords = null;
@@ -623,10 +629,55 @@ function clearSelection() {
   state.selection.copied = false;
   state.selection.isCut = false;
   state.selection.isPasted = false;
+  state.selection.isTransformed = false;
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
   state.selection.preview = { start: null, current: null, points: [] };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hideTransformOptions();
 }
+
+function showTransformOptions(){
+    let div = document.getElementById("selectionInputOverlay");
+    div.style.display = "block";
+}
+function hideTransformOptions(){
+    let div = document.getElementById("selectionInputOverlay");
+    div.style.display = "none";
+}
+
+
+const scaleSlider = document.getElementById("transform-scale");
+const scaleLabel = document.getElementById("label-transform-scale");
+const rotateSlider = document.getElementById("transform-rotation");
+const rotateLabel = document.getElementById("label-transform-rotation");
+const transformActive = document.getElementById("label-transform-active")
+
+scaleSlider.addEventListener("input", () => {
+  scaleLabel.textContent = "Resize: " + scaleSlider.value + "x";
+  state.selection.transform.scale = scaleSlider.value;
+  state.selection.active = true;
+  state.selection.isTransformed = true;
+
+  if (state.selection.isCut || state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    transformActive.textContent = "Transforming Inactive"
+  } else {
+      transformActive.textContent = "Transforming Active"
+  }
+
+});
+rotateSlider.addEventListener("input", () => {
+  rotateLabel.textContent = "Rotate: " + rotateSlider.value + "°";
+  state.selection.transform.rotation = rotateSlider.value;
+  state.selection.active = true;
+  state.selection.isTransformed = true;
+
+  if (state.selection.isCut || state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
+    transformActive.textContent = "Transforming Inactive"
+  } else {
+      transformActive.textContent = "Transforming Active"
+  }
+});
+
 
 async function postJSON(url, payload) {
   const res = await fetch(url, {
@@ -806,12 +857,15 @@ if (state.selection.isPasted) {
     operation = "move";
   } else if (state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
     operation = "move";
+  } else if (state.selection.isTransformed){
+    operation = "transform"
   } else {
     clearSelection();
     return; // No operation to commit
   }
   
   try {
+      console.log(state.selection.transform)
     const res = await fetch("/api/v1/select/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1175,6 +1229,7 @@ canvas.addEventListener("pointermove", (e) => {
 
   // Dragging active selection
   if (state.selection.isDragging && state.selection.dragStart && state.selection.initialTransform) {
+    transformActive.textContent = "Transforming Inactive"
     const [mouseX, mouseY] = getCanvasXY(e);
     const dragDx = mouseX - state.selection.dragStart.x;
     const dragDy = mouseY - state.selection.dragStart.y;
