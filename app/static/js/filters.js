@@ -222,7 +222,7 @@ async function customKernel(event) {
     //     },
     //     body: JSON.stringify(data)
     // });
-    // reloadActiveImage()
+    reloadActiveImage()
 }
 
 
