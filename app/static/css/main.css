@@ -19,6 +19,7 @@ body {
   font-family: "Inter", Arial, sans-serif;
   color: var(--fg-1);
   background: linear-gradient(135deg, var(--bg-1), var(--bg-2));
+    overflow-y: hidden;
 }
 
 h1 {
