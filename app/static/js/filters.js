@@ -214,6 +214,7 @@ async function customKernel(event) {
         array.push(row);
     }
 
+    //
     // const data = {constant: 2, array: array };
     // await fetch("/api/v1/filters/kernel_filter", {
     //     method: "POST",
@@ -222,7 +223,7 @@ async function customKernel(event) {
     //     },
     //     body: JSON.stringify(data)
     // });
-    // reloadActiveImage()
+    reloadActiveImage()
 }
 
 
