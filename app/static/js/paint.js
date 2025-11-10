@@ -45,11 +45,11 @@ const currentSize = () => (state.tool === "eraser" ? state.eraserSize : state.br
 
 state.selection = {
   active: false,      // Whether an active selection exists
-  type: null,         // 'rect', 'freeform', 'polygonal', 'magic-lasso'
+  type: null,         // 'rect', 'freeform', 'polygonal', 'magnetic'
   coords: null,       // For rect selection: [x1, y1, x2, y2]
   path: null,         // For freeform [[x1,y1], [x2,y2], ...] makes it easier to not combine these two i think
   vertices: null,     // For polygonal [[x1,y1], [x2,y2], ...]
-  seed_points: null,  // For magic lasso
+  raw_clicks: null,   // For magnetic lasso: [[x1,y1], [x2,y2], ...] raw user clicks before server processing
   mask: null,         // Base64 mask from server (optional)
   preview: {
     start: null,      // Starting point for rect selection
@@ -432,6 +432,20 @@ function drawPreviewRect(a, b) {
   ctx.restore();
 }
 
+// Point-in-polygon test using ray casting algorithm
+function isPointInPolygon(x, y, polygon) {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i][0], yi = polygon[i][1];
+    const xj = polygon[j][0], yj = polygon[j][1];
+    
+    const intersect = ((yi > y) !== (yj > y))
+        && (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+    if (intersect) inside = !inside;
+  }
+  return inside;
+}
+
 function drawPreviewEllipse(a, b) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const cx = (a.x + b.x) / 2, cy = (a.y + b.y) / 2;
@@ -571,19 +585,18 @@ function drawSelectionPreview() {
     const [x1, y1, x2, y2] = state.selection.coords;
     const dx = state.selection.transform.dx;
     const dy = state.selection.transform.dy;
-
-
+    
     const x = x1 + dx;
     const y = y1 + dy;
     const w = x2 - x1;
     const h = y2 - y1;
-
+    
     ctx.save();
     ctx.strokeStyle = "#00aaff";  // Blue selection outline
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);      // Dashed line
     ctx.strokeRect(x, y, w, h);
-
+    
     // Draw corner handles for visual feedback
     const handleSize = 6;
     ctx.fillStyle = "#00aaff";
@@ -613,27 +626,177 @@ function drawSelectionPreview() {
     ctx.strokeRect(x, y, w, h);
     ctx.restore();
   }
+
+  // Draw when active
+  if (state.tool === "select_freeform" && state.selection.active && state.selection.path) {
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    ctx.beginPath();
+    const firstPt = state.selection.path[0];
+    ctx.moveTo(firstPt[0] + dx, firstPt[1] + dy);
+
+    for (let i = 1; i < state.selection.path.length; i++) {
+      const pt = state.selection.path[i];
+      ctx.lineTo(pt[0] + dx, pt[1] + dy);
+    }
+
+    ctx.closePath();
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Preview when drawing freeform
+  if (state.tool === "select_freeform" && state.selection.preview.points.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    ctx.beginPath();
+    const pts = state.selection.preview.points;
+    ctx.moveTo(pts[0].x, pts[0].y);
+
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Draw when active (polygonal)
+  if (state.tool === "select_polygonal" && state.selection.active && state.selection.vertices) {
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    const verts = state.selection.vertices;
+    if (verts.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(verts[0][0] + dx, verts[0][1] + dy);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i][0] + dx, verts[i][1] + dy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Draw finalized magnetic selection even if current active tool is still 'select_magnetic'
+  if (state.selection.type === "magnetic" && state.selection.active && state.selection.vertices && state.tool !== "select_polygonal") {
+    const dx = state.selection.transform.dx;
+    const dy = state.selection.transform.dy;
+
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+
+    const verts = state.selection.vertices;
+    if (verts.length >= 2) {
+      ctx.beginPath();
+      ctx.moveTo(verts[0][0] + dx, verts[0][1] + dy);
+      for (let i = 1; i < verts.length; i++) {
+        ctx.lineTo(verts[i][0] + dx, verts[i][1] + dy);
+      }
+      ctx.closePath();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Preview when drawing polygonal (only while collecting vertices)
+  if (state.tool === "select_polygonal" && state.drawing && state.selection.preview.points.length > 0) {
+    const pts = state.selection.preview.points;
+    ctx.save();
+    ctx.strokeStyle = "#00aaff";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) {
+      ctx.lineTo(pts[i].x, pts[i].y);
+    }
+    // rubber-band to cursor if present
+    if (state.selection.preview.current) {
+      ctx.lineTo(state.selection.preview.current.x, state.selection.preview.current.y);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // preview for magnetic
+  if (state.tool === "select_magnetic" && state.selection.preview.points.length > 0) {
+    const pts = state.selection.preview.points;
+    ctx.save();
+
+    // distinct line to highlight its not the final form
+    ctx.strokeStyle = "#ffaa00";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6,4]);
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.stroke();
+
+    ctx.fillStyle = "#ffaa00";
+    for (const pt of pts) {
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
 }
-
-function drawSelectionMask() {
-  // Add logic to draw later
-
-  console.log("Selection mask received:", state.selection.mask ? "yes" : "no");
-}
-
 
 function clearSelection() {
   state.selection.active = false;
   state.selection.coords = null;
+  state.selection.path = null;
+  state.selection.vertices = null;
   state.selection.mask = null;
-  state.selection.copied = false;
-  state.selection.isCut = false;
+
   state.selection.isPasted = false;
-  state.selection.isTransformed = false;
+  state.selection.pasteFromCut = false;
+  state.selection.isCut = false;
+ 
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
   state.selection.preview = { start: null, current: null, points: [] };
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   hideTransformOptions();
+}
+
+function buildSelectionPayload(sel) {
+  const payload = { type: sel.type };
+  switch (sel.type) {
+    case "rect":
+      payload.coords = sel.coords;
+      break;
+    case "freeform":
+      payload.path = sel.path;
+      break;
+    case "polygonal":
+      payload.vertices = sel.vertices;
+      break;
+    case "magnetic":
+      // Prefer sending finalized vertices if available; otherwise send raw_clicks
+      if (sel.vertices && sel.vertices.length) payload.vertices = sel.vertices;
+      else if (sel.raw_clicks && sel.raw_clicks.length) payload.raw_clicks = sel.raw_clicks;
+      break;
+  }
+  return payload;
 }
 
 function showTransformOptions(){
@@ -644,7 +807,6 @@ function hideTransformOptions(){
     let div = document.getElementById("selectionInputOverlay");
     div.style.display = "none";
 }
-
 
 const scaleSlider = document.getElementById("transform-scale");
 const scaleLabel = document.getElementById("label-transform-scale");
@@ -665,6 +827,7 @@ scaleSlider.addEventListener("input", () => {
   }
 
 });
+
 rotateSlider.addEventListener("input", () => {
   rotateLabel.textContent = "Rotate: " + rotateSlider.value + "°";
   state.selection.transform.rotation = rotateSlider.value;
@@ -677,7 +840,6 @@ rotateSlider.addEventListener("input", () => {
       transformActive.textContent = "Transforming Active"
   }
 });
-
 
 async function postJSON(url, payload) {
   const res = await fetch(url, {
@@ -771,18 +933,8 @@ async function sendPickColor(x, y) {
 
 async function fetchSelectionMask() {
   if (!state.selection.active) return;
-  
-  const payload = { image_id: "current"};
 
-  if (state.selection.type === "rect") {
-    payload.coords = state.selection.coords;
-  } else if (state.selection.type === "freeform") {
-    payload.path = state.selection.path;
-  } else if (state.selection.type === "polygonal") {
-    payload.vertices = state.selection.vertices;
-  } else if (state.selection.type === "magic-lasso") {
-    payload.seed_points = state.selection.seed_points;
-  }
+  const payload = { image_id: "current", ...buildSelectionPayload(state.selection) };
 
   try {
     const res = await fetch(`/api/v1/select/${state.selection.type}`, {
@@ -799,11 +951,44 @@ async function fetchSelectionMask() {
     const data = await res.json();
     state.selection.mask = data.mask; // base64 mask
 
-    drawSelectionMask();
   } catch (err) {
     console.error("Selection fetch error:", err);
   }
 }
+
+async function finalizeMagneticSelection() {
+  if (!state.selection.raw_clicks || state.selection.raw_clicks.length < 3) return;
+
+  // make consitent with backend
+  const payload = {
+    image_id: "current",
+    raw_clicks: state.selection.raw_clicks,
+  };
+
+  try {
+    // POST using helper
+    const res = await postJSON("/api/v1/select/magnetic", payload);
+    if (!res) throw new Error("Empty response from magnetic finalize");
+
+    // Server should return { path: [[x,y],...], mask: <base64>, segment_modes?: [...] }
+    state.selection.vertices = res.path || [];
+    state.selection.mask = res.mask || null;
+
+  // Keep selection type as 'magnetic' so the UI/tool doesn't change unexpectedly.
+  // Server now accepts 'magnetic' in apply/delete, so we don't force a tool switch here.
+  state.selection.type = "magnetic";
+    state.selection.active = true;
+    state.drawing = false;
+    state.selection.raw_clicks = null;
+    state.selection.preview.points = [];
+
+    // render the beauty
+    drawSelectionPreview();
+  } catch (err) {
+    console.error("Magnetic finalize error:", err);
+  }
+}
+
 
 async function copySelection() {
   if (!state.selection.active) return;
@@ -813,8 +998,11 @@ async function copySelection() {
 
   // Store original for pasting
   state.selection.clipboard = {
+    mode: "copy",
     type: state.selection.type,
-    coords: [...state.selection.coords]
+    coords: state.selection.coords ? [...state.selection.coords] : null,
+    path: state.selection.path ? state.selection.path.map(pt => [...pt]) : null,
+    vertices: state.selection.vertices ? state.selection.vertices.map(pt => [...pt]) : null,
   };
 }
 
@@ -824,8 +1012,11 @@ async function cutSelection() {
   state.selection.copied = true;
   state.selection.isCut = true;
   state.selection.clipboard = {
+    mode: "cut",
     type: state.selection.type,
-    coords: [...state.selection.coords]
+    coords: state.selection.coords ? [...state.selection.coords] : null,
+    path: state.selection.path ? state.selection.path.map(pt => [...pt]) : null,
+    vertices: state.selection.vertices ? state.selection.vertices.map(pt => [...pt]) : null,
   };
 
   // Visual feedback that its cut so dim area or those fancy edges stuff like that
@@ -834,12 +1025,18 @@ async function cutSelection() {
 async function pasteSelection() {
   if (!state.selection.copied || !state.selection.clipboard) return;
 
+  const clip = state.selection.clipboard;
+
   // For now, just restore at original position might add restore on mouse pointer
-  state.selection.coords = [...state.selection.clipboard.coords];
-  state.selection.type = state.selection.clipboard.type;
+  state.selection.coords = clip.coords ? [...clip.coords] : null;
+  state.selection.path = clip.path ? clip.path.map(pt => [...pt]) : null;
+  state.selection.vertices = clip.vertices ? clip.vertices.map(pt => [...pt]) : null;
+  state.selection.type = clip.type;
+
   state.selection.active = true;
   state.selection.transform = { dx: 0, dy: 0, scaleX: 1.0, scaleY: 1.0 };
   state.selection.isPasted = true;
+  state.selection.pasteFromCut = (clip.mode === "cut");
 
   drawSelectionPreview();
 
@@ -851,8 +1048,9 @@ async function commitSelection() {
   
   let operation;
 
-if (state.selection.isPasted) {
-    operation = "copy";
+  // Prioritize pasted instances as copy, so dragging a pasted selection doesn't cut the original
+  if (state.selection.isPasted) {
+    operation = state.selection.pasteFromCut ? "move" : "copy";
   } else if (state.selection.isCut) {
     operation = "move";
   } else if (state.selection.transform.dx !== 0 || state.selection.transform.dy !== 0) {
@@ -863,18 +1061,16 @@ if (state.selection.isPasted) {
     clearSelection();
     return; // No operation to commit
   }
+
+  const selectionData = buildSelectionPayload(state.selection);
   
   try {
-      console.log(state.selection.transform)
     const res = await fetch("/api/v1/select/apply", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        operation: operation,
-        selection: {
-          type: state.selection.type,
-          coords: state.selection.coords,
-        },
+        operation,
+        selection: selectionData,
         transform: state.selection.transform,
       })
     });
@@ -886,7 +1082,6 @@ if (state.selection.isPasted) {
 
     reloadImage();
     clearSelection();
-    
   } catch (err) {
     console.error("Commit error:", err);
   }
@@ -895,18 +1090,14 @@ if (state.selection.isPasted) {
 async function deleteSelection() {
   if (!state.selection.active) return;
 
+  const selectionData = buildSelectionPayload(state.selection);
 
-  // havent made delete endpoint yet
   try {
     const res = await fetch("/api/v1/select/delete", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        operation: "move",
-        selection: {
-          type: state.selection.type,
-          coords: state.selection.coords,
-        },
+        selection: selectionData,
       })
     });
     if (!res.ok) {
@@ -1047,9 +1238,12 @@ document.addEventListener("click", (e) => {
     return;
   }
 
-  if (tool === "select_magic_lasso") {
-    setActiveTool("select_magic_lasso");
-    state.selection.type = "magic-lasso";
+  if (tool === "select_magnetic") {
+    setActiveTool("select_magnetic");
+    state.selection.type = "magnetic";
+    // Ensure preview storage empty
+    state.selection.raw_clicks = [];
+    state.selection.preview.points = [];
     return;
   }
 
@@ -1183,14 +1377,29 @@ canvas.addEventListener("pointerdown", async (e) => {
     state.points = [getCanvasXY(e)];
   }
 
-  if (state.selection.active && state.selection.coords) {
+  // Check if clicking inside an active selection to drag it
+  if (state.selection.active) {
     const [mouseX, mouseY] = getCanvasXY(e);
-    const [x1, y1, x2, y2] = state.selection.coords;
     const dx = state.selection.transform.dx;
     const dy = state.selection.transform.dy;
+    
+    let insideSelection = false;
 
-    // Check if click is inside selection bounds
-    if (mouseX >= x1 + dx && mouseX <= x2 + dx && mouseY >= y1 + dy && mouseY <= y2 + dy) {
+    if (state.selection.coords) {
+      // Rectangular selection bounds check
+      const [x1, y1, x2, y2] = state.selection.coords;
+      insideSelection = (mouseX >= x1 + dx && mouseX <= x2 + dx && mouseY >= y1 + dy && mouseY <= y2 + dy);
+    } else if (state.selection.path) {
+      // Freeform selection - check if point is inside path using point-in-polygon
+      const adjustedPath = state.selection.path.map(([x, y]) => [x + dx, y + dy]);
+      insideSelection = isPointInPolygon(mouseX, mouseY, adjustedPath);
+    } else if (state.selection.vertices) {
+      // Polygonal selection - point-in-polygon using vertices
+      const adjustedVerts = state.selection.vertices.map(([x, y]) => [x + dx, y + dy]);
+      insideSelection = isPointInPolygon(mouseX, mouseY, adjustedVerts);
+    }
+
+    if (insideSelection) {
       state.selection.isDragging = true;
       state.selection.dragStart = { x: mouseX, y: mouseY };
       state.selection.initialTransform = { ...state.selection.transform };
@@ -1198,6 +1407,22 @@ canvas.addEventListener("pointerdown", async (e) => {
       return;
     }
   }
+
+  if (state.tool === "select_magnetic") {
+
+  // collect raw clicks for magnetic selection preview
+  const [x, y] = getCanvasXY(e);
+  state.selection.raw_clicks = state.selection.raw_clicks || [];
+  state.selection.raw_clicks.push([x, y]);
+
+  // Use preview.points as existing preview drawing code expects {x,y}
+  state.selection.preview.points = state.selection.raw_clicks.map(([px, py]) => ({ x: px, y: py }));
+
+  // Ensure drawing mode
+  state.drawing = true;
+  drawSelectionPreview(); // reuse the existing preview draw
+  return;
+}
 
   if (state.tool === "select_rect") {
     // Clear previous selection
@@ -1207,6 +1432,50 @@ canvas.addEventListener("pointerdown", async (e) => {
     state.selection.preview.start = { x, y };
     state.drawing = true;
     canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  if (state.tool === "select_freeform") {
+    clearSelection();
+
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.points = [{ x,y}];
+    state.drawing = true;
+    canvas.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  if (state.tool === "select_polygonal") {
+    // Start or extend polygon
+    const [x, y] = getCanvasXY(e);
+    if (!state.selection.active && state.selection.preview.points.length === 0) {
+      // New polygon
+      state.selection.preview.points = [{ x, y }];
+      state.drawing = true; // treat as drawing mode while collecting vertices
+      drawSelectionPreview();
+    } else if (!state.selection.active) {
+      // Add vertex
+      state.selection.preview.points.push({ x, y });
+      drawSelectionPreview();
+    } else {
+      // If already active, allow drag move like other selections
+      const dx = state.selection.transform.dx;
+      const dy = state.selection.transform.dy;
+      const adjusted = state.selection.vertices.map(([vx, vy]) => [vx + dx, vy + dy]);
+      if (isPointInPolygon(x, y, adjusted)) {
+        state.selection.isDragging = true;
+        state.selection.dragStart = { x, y };
+        state.selection.initialTransform = { ...state.selection.transform };
+        canvas.setPointerCapture(e.pointerId);
+        return;
+      } else {
+        // Click outside clears existing selection and starts new polygon
+        clearSelection();
+        state.selection.type = "polygonal";
+        state.selection.preview.points = [{ x, y }];
+        state.drawing = true;
+      }
+    }
     return;
   }
 });
@@ -1248,6 +1517,22 @@ canvas.addEventListener("pointermove", (e) => {
     drawSelectionPreview();
     return;
   }
+
+  if (state.tool === "select_freeform" && state.drawing) {
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.points.push({ x, y });
+    drawSelectionPreview();
+    return;
+  }
+
+  if (state.tool === "select_polygonal" && state.drawing) {
+    // Track hover for rubber-band preview
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.current = { x, y };
+    drawSelectionPreview();
+    return;
+  }
+
 
   if (!state.drawing) return;
 
@@ -1313,6 +1598,14 @@ canvas.addEventListener("pointerup", async (e) => {
     return;
   }
 
+  // Short-circuit pointerup for magnetic tool so we don't trigger stroke/send behavior
+  if (state.tool === "select_magnetic") {
+    // keep preview points intact until user finalizes with Enter
+    state.drawing = false;
+    try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    return;
+  }
+
   if (state.tool === "select_rect") {
     const [x, y] = getCanvasXY(e);
     const start = state.selection.preview.start;
@@ -1342,6 +1635,42 @@ canvas.addEventListener("pointerup", async (e) => {
     return;
     }
 
+  if (state.tool === "select_freeform" && state.drawing) {
+    const [x, y] = getCanvasXY(e);
+    state.selection.preview.points.push({ x, y });
+
+    state.selection.path = state.selection.preview.points.map(p => [p.x, p.y]);
+
+    state.selection.active = true;
+    state.drawing = false;
+
+    // Clear preview data
+    state.selection.preview.points = [];
+
+    await fetchSelectionMask();
+
+    drawSelectionPreview();
+
+    canvas.releasePointerCapture(e.pointerId);
+    return;
+  }
+
+  if (state.tool === "select_polygonal" && state.drawing) {
+    // Finish polygon on double-click or Enter handled separately; pointerup does not finalize
+    // If user double-clicks quickly (detail===2) and >=3 points, we finalize here too
+    if (e.detail === 2 && state.selection.preview.points.length >= 3) {
+      state.selection.vertices = state.selection.preview.points.map(p => [p.x, p.y]);
+      state.selection.active = true;
+      state.drawing = false;
+      state.selection.preview.current = null;
+      state.selection.preview.points = [];
+      await fetchSelectionMask();
+      drawSelectionPreview();
+      try { canvas.releasePointerCapture(e.pointerId); } catch {}
+    }
+    return;
+  }
+
 
   if (!state.drawing) return;
   state.drawing = false;
@@ -1359,6 +1688,50 @@ canvas.addEventListener("dragstart", (e) => e.preventDefault());
 
 document.addEventListener("keydown", async (e) => {
   // can add keybinds for undo here
+
+  // Special-case: allow finalizing polygon while drawing BEFORE active-check
+  if (state.tool === "select_polygonal" && state.drawing) {
+    if (e.key === "Enter" && state.selection.preview.points.length >= 3) {
+      e.preventDefault();
+      state.selection.vertices = state.selection.preview.points.map(p => [p.x, p.y]);
+      state.selection.active = true;
+      state.drawing = false;
+      state.selection.preview.current = null;
+      state.selection.preview.points = [];
+      await fetchSelectionMask();
+      drawSelectionPreview();
+      return;
+    }
+  }
+
+  // Special-case: allow finalizing magnetic selection and undo even after pointerup
+  if (state.tool === "select_magnetic" && state.selection.raw_clicks) {
+    if (e.key === "Enter" && state.selection.raw_clicks.length >= 3) {
+      e.preventDefault();
+      await finalizeMagneticSelection();
+      return;
+    }
+    if (e.key === "Backspace") {
+      e.preventDefault();
+      // delete last point
+      if (state.selection.raw_clicks && state.selection.raw_clicks.length > 0) {
+        state.selection.raw_clicks.pop();
+        state.selection.preview.points = state.selection.raw_clicks.map(([x, y]) => ({ x, y }));
+        drawSelectionPreview();
+      }
+      return;
+    }
+    if (e.key === "Escape") {
+      // allow user to cancel the raw-click preview with Escape
+      e.preventDefault();
+      state.selection.raw_clicks = [];
+      state.selection.preview.points = [];
+      state.drawing = false;
+      drawSelectionPreview();
+      return;
+    }
+  }
+
   // Only if there is an active selection
   if (!state.selection.active) return;
 
