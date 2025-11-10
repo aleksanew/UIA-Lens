@@ -26,7 +26,7 @@
 
 .menus {
   grid-column: 2;
-  justify-self: center;
+  justify-self: left;
   align-items: center;
   gap: .5rem;
 }
@@ -255,8 +255,9 @@
 }
 
 .zoom-overlay {
+        margin-top: 40rem;
   position: absolute;
-  bottom: 16px;
+  /*bottom: 16px;*/
   left: 50%;
   transform: translateX(-50%);
   display: flex;
@@ -416,6 +417,9 @@
     cursor: pointer;
     transition: all 0.3s ease;
     width: 100%;
+}
+.brand{
+    margin-left: -40rem;
 }
 
 .filter-option input[type="submit"]:hover {

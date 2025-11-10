@@ -579,7 +579,7 @@ function drawSegment(a, b) {
 
 function drawSelectionPreview() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
+    showTransformOptions();
   if (state.tool === "select_rect" && state.selection.active && state.selection.coords) {
     // Draw the selection rectangle with transform applied
     const [x1, y1, x2, y2] = state.selection.coords;
@@ -606,7 +606,6 @@ function drawSelectionPreview() {
     ctx.fillRect(x + w - handleSize/2, y + h - handleSize/2, handleSize, handleSize);
 
     ctx.restore();
-    showTransformOptions();
   }
   
   // Also handle preview while drawing (before committed)
