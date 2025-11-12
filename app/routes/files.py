@@ -33,37 +33,7 @@ def _load_image_from_upload(file_storage):
         img = cv2.cvtColor(img, cv2.COLOR_BGR2BGRA)
     return img
 
-@bp.route("/new", methods=["POST"])
-def new_project():
-    # create new unique ID and directory
-    pid = storage.new_project(_root(), "new project")
-    session["pid"] = pid
-
-    # initialize new layerstack with base layers (background + empty layer)
-    stack = LayerStack.LayerStack(500, 500)
-    stack.add_base_layers()
-    user_path = get_user_path(pid)
-
-    # generate layer images and save serialized state
-    storage.redraw_all_images(stack)
-    stack.save_pickle(os.path.join(user_path, "layers.pickle"))
-
-    # ensure metadata uses schema (id, name, layers)
-    project_info = {
-        "id": pid,
-        "name": "new project",
-        "layers": []
-    }
-    with open(get_project_json_path(pid), "w") as f:
-        json.dump(project_info, f, indent=4)
-
-    return jsonify(
-        {
-            "status": "success",
-            "message": "New project created",
-            "project": project_info
-        }
-    )
+# new project is handled by fileops.js/ui.py
 
 @bp.route("/open", methods=["POST"])
 def open_project():

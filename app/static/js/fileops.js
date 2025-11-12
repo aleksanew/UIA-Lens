@@ -23,6 +23,29 @@
     return res.json();
   }
 
+  async function createNewProject(){
+    let w = prompt("Canvas width in pixels");
+    let h = prompt("Canvas height in pixels")
+    let parsed_w = parseInt(w)
+    let parsed_h = parseInt(h)
+    if (w != parsed_w || parsed_w < 1){
+        w = 500;
+    }
+    if (h != parsed_h || parsed_h < 1){
+        h = 500
+    }
+    let res = await fetch("/api/v1/open_new_project", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        width: parseInt(w),
+          height: parseInt(h)
+      })
+    });
+    if (!res.ok) throw new Error(await res.text());
+    window.location.replace(res.url || '/api/v1/editor');
+  }
+
   function reloadEditor(){
     // Ensure we are on editor after operations that change pid
     window.location.assign('/api/v1/editor');
@@ -33,8 +56,7 @@
   btnNew?.addEventListener('click', async (e) => {
     e.preventDefault();
     try {
-      await postJSON('/api/v1/files/new');
-      reloadEditor();
+      await createNewProject();
     } catch (err) {
       alert('New project failed: ' + err.message);
     }

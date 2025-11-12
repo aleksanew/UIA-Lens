@@ -24,7 +24,7 @@ Make sure you have:
 
 ## ⚙️ Installation
 Clone the repository:
-```bash
+bash
 git clone https://github.com/aleksanew/UIA-Lens.git
 cd UIA-Lens
 
@@ -43,4 +43,14 @@ flask run
 
 Then open browser and go to:
 http://127.0.0.1:5000
+
+## App Navigation
+To use the different tools, click the buttons on the left hand side.
+Layer controls are on the right hand side.
+Earlier projects are easily accessible on the right hand side.
+To cycle through shapes, click the button multiple times.
+To write text, click the text button and then click on the canvas.
+  Text and Shape settings are on the right hand side.
+  Shape outline width is the same as the draw/stroke width
+
 
