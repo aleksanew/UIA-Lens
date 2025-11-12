@@ -137,13 +137,7 @@ def apply_selection():
         scale = trans.get('scale', 1.0)
         rotation_deg = trans.get('rotation', 0)
 
-        src_img = transform.rotate(src_image, mask, int(rotation_deg))
-
-        bgra_mask = cv2.cvtColor(mask, cv2.COLOR_GRAY2BGRA)
-        bgra_mask = transform.rotate(bgra_mask, mask, int(rotation_deg))
-        mask = cv2.cvtColor(bgra_mask, cv2.COLOR_BGRA2GRAY)
-
-        src_img = transform.rescale(src_img, mask, float(scale))
+        src_img = transform.transform(src_image, mask, int(rotation_deg), float(scale))
 
         src_layer.update(src_img)
         storage.save_layers(stack)

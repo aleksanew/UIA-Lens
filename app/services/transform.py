@@ -4,28 +4,28 @@ import numpy as np
 
 
 
-def rotate(img, mask, deg:int):
+def transform(img, mask, deg:int, scale:float):
     if deg>360:
         deg=0
-
     deg = 360 - deg # Makes rotation clockwise
 
     center = _find_center(mask)
     back = _blank_out(img, mask)
     fore = _extract(img, mask)
-    fore = _rotate(fore, deg, center)
+    fore = _transform(fore, deg, scale, center)
     img = _blend(back, fore)
     return img
 
 
-def rescale(img, mask, scale:float):
-    center = _find_center(mask)
-    back = _blank_out(img, mask)
-    fore = _extract(img, mask)
-    fore = _rescale(fore, scale, center)
-    img = _blend(back, fore)
-    return img
+# Rotate and rescale an image around a center point
+def _transform(img, deg, scale, center):
+    h, w, d = img.shape
+    cx, cy = center
 
+    matrix = cv2.getRotationMatrix2D((cx, cy), deg, scale)
+    # dsize=(w, h) ensures the output image is the same size as the original
+    transformed = cv2.warpAffine(img, matrix, dsize=(w, h), flags=cv2.INTER_LINEAR)
+    return transformed
 
 # Extract part of an image based on mask.
 # Extracted image has same shape as original (padded with (0,0,0,0))
@@ -107,27 +107,6 @@ def _find_center(mask):
     cx, cy = (x1 + x2) / 2, (y1 + y2) / 2
     return cx, cy
 
-# Rotate an image around a center point
-def _rotate(img, deg, center):
-    h, w, d = img.shape
-    cx, cy = center
-
-    matrix = cv2.getRotationMatrix2D((cx, cy), deg, 1)
-    rotated = cv2.warpAffine(img, matrix, dsize=(w, h), flags=cv2.INTER_LINEAR)
-    return rotated
-
-# Rescale an image from a center point
-def _rescale(img, scale, center):
-    h, w, d = img.shape
-    cx, cy = center
-
-    matrix = np.float32([
-        [scale, 0, (1 - scale) * cx],
-        [0, scale, (1 - scale) * cy]
-    ])
-    # dsize=(w, h) ensures the output image is the same size as the original
-    scaled = cv2.warpAffine(img, matrix, dsize=(w, h), flags=cv2.INTER_LINEAR)
-    return scaled
 
 
 # For testing only
